@@ -10,6 +10,7 @@
  * \/ \/ \/
  */
 //#include "../usermods/EXAMPLE_v2/usermod_v2_example.h"
+#include "../usermods/borealis/borealis.h"
 
 #ifdef USERMOD_BATTERY
 #include "../usermods/Battery/usermod_v2_Battery.h"
@@ -215,6 +216,8 @@ void registerUsermods()
    * \/ \/ \/
    */
   //usermods.add(new MyExampleUsermod());
+usermods.add(new BorealisUsermod());
+
 #ifdef USERMOD_BATTERY
   usermods.add(new UsermodBattery("Battery", false));  // WLEDMM
 #endif

@@ -7,10 +7,10 @@
  */
 
 // version code in format yymmddb (b = daily build)
-#define VERSION 2501170
+#define VERSION 2501290
 
 // WLEDMM  - you can check for this define in usermods, to only enabled WLEDMM specific code in the "right" fork. Its not defined in AC WLED.
-#define _MoonModules_WLED_
+#define _Borealis_WLED_
 
 //WLEDMM + Moustachauve/Wled-Native 
 // You can define custom product info from build flags.
@@ -27,7 +27,7 @@
   #define WLED_BRAND "WLED"
 #endif
 #ifndef WLED_PRODUCT_NAME
-  #define WLED_PRODUCT_NAME "MoonModules"
+  #define WLED_PRODUCT_NAME "Borealis"
 #endif
 
 //uncomment this if you have a "my_config.h" file you'd like to use

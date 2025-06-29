@@ -6,7 +6,6 @@
 	<script>
 		function B() { window.history.back(); }
 		function U() { document.getElementById("uf").style.display="none";document.getElementById("msg").style.display="block"; }
-		function GetV() {/*injected values here*/}
 	</script>
 	<style>
 		@import url("style.css");
@@ -14,11 +13,12 @@
 </head>
 
 <body onload="GetV()">
-	<h2>MoonMod WLED Software Update</h2>
+	<h2>Borealis Software Update</h2>
 	<form method='POST' action='/update' id='uf' enctype='multipart/form-data' onsubmit="U()">
-		<span class="sip">##VERSION##</span><br> <!--WLEDMM: show bin name-->
-		Download the latest release: <a href="https://github.com/MoonModules/WLED/releases" target="_blank">
-		<img src="https://img.shields.io/github/release/MoonModules/WLED.svg?style=flat-square"></a><br>
+		<span class="sip">Current version: ##VERSION##</span><br> <!--WLEDMM: show bin name-->
+		Get the latest software from<br>
+		<a href="https://borealis.fashion/update" target="_blank">https://borealis.fashion/update</a><br>
+		then upload it below.<br>
 		<input type='file' name='update' required><br> <!--should have accept='.bin', but it prevents file upload from android app-->
 		<button type="submit">Update!</button><br>
 		<button type="button" onclick="B()">Back</button>

@@ -1,1464 +1,2257 @@
-//page js
-var loc = false, locip;
-var noNewSegs = false;
-var isOn = false, isInfo = false, isNodes = false, isRgbw = false, cct = false;
-var whites = [0,0,0];
-var selColors;
-var powered = [true];
-var selectedFx = 0;
-var selectedPal = 0;
-var csel = 0;
-var currentPreset = -1;
-var lastUpdate = 0;
-var segCount = 0, ledCount = 0, lowestUnused = 0, maxSeg = 0, lSeg = 0;
-var tr = 7;
-var d = document;
-var palettesData;
-var fxdata = [];
-var pJson = {}, eJson = {}, lJson = {};
-var pN = "", pI = 0, pNum = 0;
-var pmt = 1, pmtLS = 0, pmtLast = 0;
-var lastinfo = {};
-var ws, cpick, ranges;
-var cfg = {
-	theme:{base:"dark", bg:{url:""}, alpha:{bg:0.6,tab:0.8}, color:{bg:""}},
-	comp :{colors:{picker: true, rgb: false, quick: true, hex: false}, labels:true, pcmbot:false, pid:true, seglen:false}
-};
-var hol = [
-	[0,11,24,4,"https://aircoookie.github.io/xmas.png"], // christmas
-	[0,2,17,1,"https://images.alphacoders.com/491/491123.jpg"], // st. Patrick's day
-	[2022,3,17,2,"https://aircoookie.github.io/easter.png"],
-	[2023,3,9,2,"https://aircoookie.github.io/easter.png"],
-	[2024,2,31,2,"https://aircoookie.github.io/easter.png"]
-];
-
-function handleVisibilityChange() {if (!d.hidden && new Date () - lastUpdate > 3000) requestJson();}
-function sCol(na, col) {d.documentElement.style.setProperty(na, col);}
-function gId(c) {return d.getElementById(c);}
-function gEBCN(c) {return d.getElementsByClassName(c);}
-function isEmpty(o) {return Object.keys(o).length === 0;}
-function isObj(i) { return (i && typeof i === 'object' && !Array.isArray(i)); }
-
-function applyCfg()
-{
-	cTheme(cfg.theme.base === "light");
-	var bg = cfg.theme.color.bg;
-	if (bg) sCol('--c-1', bg);
-	var ccfg = cfg.comp.colors;
-	//gId('picker').style.display = "none"; // ccfg.picker ? "block":"none";
-	//gId('vwrap').style.display = "none"; // ccfg.picker ? "block":"none";
-	//gId('rgbwrap').style.display = ccfg.rgb ? "block":"none";
-	gId('qcs-w').style.display = ccfg.quick ? "block":"none";
-	var l = cfg.comp.labels; //l = false;
-	var e = d.querySelectorAll('.tab-label');
-	for (var i=0; i<e.length; i++) e[i].style.display = l ? "block":"none";
-	e = d.querySelectorAll('.label');
-	for (var i=0; i<e.length; i++) e[i].style.display = l ? "block":"none";
-	e = d.querySelector('.hd');
-	e.style.display = l ? "block":"none";
-	//sCol('--tbp',l ? "14px 14px 10px 14px":"10px 22px 4px 22px");
-	sCol('--bbp',l ? "9px 0 7px 0":"10px 0 4px 0");
-	sCol('--bhd',l ? "block":"none");
-	sCol('--bmt',l ? "0px":"5px");
-	sCol('--t-b', cfg.theme.alpha.tab);
-	size();
-	localStorage.setItem('wledUiCfg', JSON.stringify(cfg));
-}
-
-function tglTheme()
-{
-	cfg.theme.base = (cfg.theme.base === "light") ? "dark":"light";
-	applyCfg();
-}
-
-function tglLabels()
-{
-	cfg.comp.labels = !cfg.comp.labels;
-	applyCfg();
-}
-
-function cTheme(light) {
-	if (light) {
-	sCol('--c-1','#eee');
-	sCol('--c-f','#000');
-	sCol('--c-2','#ddd');
-	sCol('--c-3','#bbb');
-	sCol('--c-4','#aaa');
-	sCol('--c-5','#999');
-	sCol('--c-6','#999');
-	sCol('--c-8','#888');
-	sCol('--c-b','#444');
-	sCol('--c-c','#333');
-	sCol('--c-e','#111');
-	sCol('--c-d','#222');
-	sCol('--c-r','#c21');
-	sCol('--c-g','#2c1');
-	sCol('--c-l','#26c');
-	sCol('--c-o','rgba(204, 204, 204, 0.9)');
-	sCol('--c-sb','#0003'); sCol('--c-sbh','#0006');
-	sCol('--c-tb','rgba(204, 204, 204, var(--t-b))');
-	sCol('--c-tba','rgba(170, 170, 170, var(--t-b))');
-	sCol('--c-tbh','rgba(204, 204, 204, var(--t-b))');
-	gId('imgw').style.filter = "invert(0.8)";
-	} else {
-	sCol('--c-1','#111');
-	sCol('--c-f','#fff');
-	sCol('--c-2','#222');
-	sCol('--c-3','#333');
-	sCol('--c-4','#444');
-	sCol('--c-5','#555');
-	sCol('--c-6','#666');
-	sCol('--c-8','#888');
-	sCol('--c-b','#bbb');
-	sCol('--c-c','#ccc');
-	sCol('--c-e','#eee');
-	sCol('--c-d','#ddd');
-	sCol('--c-r','#e42');
-	sCol('--c-g','#4e2');
-	sCol('--c-l','#48a');
-	sCol('--c-o','rgba(34, 34, 34, 0.9)');
-	sCol('--c-sb','#fff3'); sCol('--c-sbh','#fff5');
-	sCol('--c-tb','rgba(34, 34, 34, var(--t-b))');
-	sCol('--c-tba','rgba(102, 102, 102, var(--t-b))');
-	sCol('--c-tbh','rgba(51, 51, 51, var(--t-b))');
-	gId('imgw').style.filter = "unset";
-	}
-}
-
-function loadBg(iUrl)
-{
-	let bg = document.getElementById('bg');
-	let img = document.createElement("img");
-	img.src = iUrl;
-	img.addEventListener('load', (event) => {
-		var a = parseFloat(cfg.theme.alpha.bg);
-		if (isNaN(a)) a = 0.6;
-		bg.style.opacity = a;
-		bg.style.backgroundImage = `url(${img.src})`;
-		img = null;
-	});
-}
-
-function loadSkinCSS(cId)
-{
-	if (!gId(cId))	// check if element exists
-	{
-		var h  = document.getElementsByTagName('head')[0];
-		var l  = document.createElement('link');
-		l.id   = cId;
-		l.rel  = 'stylesheet';
-		l.type = 'text/css';
-		l.href = (loc?`http://${locip}`:'.') + '/skin.css';
-		l.media = 'all';
-		h.appendChild(l);
-	}
-}
-
-async function onLoad()
-{
-	if (window.location.protocol == "file:") {
-		loc = true;
-		locip = localStorage.getItem('locIp');
-		if (!locip)
-		{
-			locip = prompt("File Mode. Please enter WLED IP!");
-			localStorage.setItem('locIp', locip);
-		}
-	}
-	var sett = localStorage.getItem('wledUiCfg');
-	if (sett) cfg = mergeDeep(cfg, JSON.parse(sett));
-
-	makeWS();
-
-	applyCfg();
-	if (cfg.theme.bg.url=="" || cfg.theme.bg.url === "https://picsum.photos/1920/1080") {
-		var iUrl = cfg.theme.bg.url;
-		fetch((loc?`http://${locip}`:'.') + "/holidays.json", {
-			method: 'get'
-		})
-		.then((res)=>{
-			return res.json();
-		})
-		.then((json)=>{
-			if (Array.isArray(json)) hol = json;
-			//TODO: do some parsing first
-		})
-		.catch((e)=>{
-			console.log("holidays.json does not contain array of holidays. Defaults loaded.");
-		})
-		.finally(()=>{
-			var today = new Date();
-			for (var i=0; i<hol.length; i++) {
-				var yr = hol[i][0]==0 ? today.getFullYear() : hol[i][0];
-				var hs = new Date(yr,hol[i][1],hol[i][2]);
-				var he = new Date(hs);
-				he.setDate(he.getDate() + hol[i][3]);
-				if (today>=hs && today<he) iUrl = hol[i][4];
-			}
-			if (iUrl !== "") loadBg(iUrl);
-		});
-	} else
-		loadBg(cfg.theme.bg.url);
-	loadSkinCSS('skinCss');
-
-	var cd = gId('csl').children;
-	for (var i = 0; i < cd.length; i++) cd[i].style.backgroundColor = "rgb(0, 0, 0)";
-	selectSlot(0);
-	cpick.on("input:end", ()=>{
-		setColor(1);
-	});
-	pmtLS = localStorage.getItem('wledPmt');
-
-	// Load initial data
-	loadPalettes(()=>{
-		loadPalettesData(redrawPalPrev);
-		loadFX(()=>{
-			loadFXData();
-			loadPresets(()=>{
-				requestJson();
-			});
-		});
-	});
-
-	d.addEventListener("visibilitychange", handleVisibilityChange, false);
-	size();
-	gId("cv").style.opacity=0;
-	var sls = d.querySelectorAll('input[type="range"]');
-	for (var sl of sls) {
-		sl.addEventListener('touchstart', toggleBubble);
-		sl.addEventListener('touchend', toggleBubble);
-	}
-}
-
-var timeout;
-function showToast(text, error = false)
-{
-	if (error) gId('connind').style.backgroundColor = "var(--c-r)";
-	var x = gId("toast");
-	x.innerHTML = text;
-	x.className = error ? "error":"show";
-	clearTimeout(timeout);
-	x.style.animation = 'none';
-	timeout = setTimeout(()=>{ x.classList.remove("show"); }, 2900);
-	if (error) console.log(text);
-}
-
-function showErrorToast()
-{
-	if (ws && ws.readyState === WebSocket.OPEN) {
-		// if we received a timeout force WS reconnect
-		ws.close();
-		ws = null;
-		if (lastinfo.ws > -1) setTimeout(makeWS,500);
-	}
-	showToast('Connection to light failed!', true);
-}
-
-function clearErrorToast() {gId("toast").className = gId("toast").className.replace("error", "");}
-
-function getRuntimeStr(rt)
-{
-	var t = parseInt(rt);
-	var days = Math.floor(t/86400);
-	var hrs = Math.floor((t - days*86400)/3600);
-	var mins = Math.floor((t - days*86400 - hrs*3600)/60);
-	var str = days ? (days + " " + (days == 1 ? "day" : "days") + ", ") : "";
-	str += (hrs || days) ? (hrs + " " + (hrs == 1 ? "hour" : "hours")) : "";
-	if (!days && hrs) str += ", ";
-	if (t > 59 && !days) str += mins + " min";
-	if (t < 3600 && t > 59) str += ", ";
-	if (t < 3600) str += (t - mins*60) + " sec";
-	return str;
-}
-
-function inforow(key, val, unit = "")
-{
-	return `<tr><td class="keytd">${key}</td><td class="valtd">${val}${unit}</td></tr>`;
-}
-
-function pName(i)
-{
-	var n = "Preset " + i;
-	if (pJson && pJson[i] && pJson[i].n) n = pJson[i].n;
-	return n;
-}
-
-function isPlaylist(i)
-{
-	return pJson[i].playlist && pJson[i].playlist.ps;
-}
-
-function papiVal(i)
-{
-	if (!pJson || !pJson[i]) return "";
-	var o = Object.assign({},pJson[i]);
-	if (o.win) return o.win;
-	delete o.n; delete o.p; delete o.ql;
-	return JSON.stringify(o);
-}
-
-function qlName(i)
-{
-	if (!pJson || !pJson[i] || !pJson[i].ql) return "";
-	return pJson[i].ql;
-}
-
-function cpBck()
-{
-	var copyText = gId("bck");
-
-	copyText.select();
-	copyText.setSelectionRange(0, 999999);
-	d.execCommand("copy");
-	showToast("Copied to clipboard!");
-}
-
-function loadPresets(callback = null)
-{
-	//1st boot (because there is a callback)
-	if (callback && pmt == pmtLS && pmt > 0) {
-		//we have a copy of the presets in local storage and don't need to fetch another one
-        pJson = JSON.parse(localStorage.getItem("wledP"));
-		populatePresets();
-		pmtLast = pmt;
-		callback();
-		return;
-	}
-
-	//afterwards
-	if (!callback && pmt == pmtLast) return;
-
-	pmtLast = pmt;
-
-	var url = (loc?`http://${locip}`:'') + '/presets.json';
-
-	fetch(url, {
-		method: 'get'
-	})
-	.then(res => {
-		if (!res.ok) showErrorToast();
-		return res.json();
-	})
-	.then(json => {
-		clearErrorToast();
-		pJson = json;
-		populatePresets();
-	})
-	.catch(function (error) {
-		showToast(error, true);
-		console.log(error);
-	})
-	.finally(()=>{
-		if (callback) setTimeout(callback,99);
-	});
-}
-
-function loadPalettes(callback = null)
-{
-	var url = (loc?`http://${locip}`:'') + '/json/palettes';
-
-	fetch(url, {
-		method: 'get'
-	})
-	.then(res => {
-		if (!res.ok) showErrorToast();
-		return res.json();
-	})
-	.then(json => {
-		clearErrorToast();
-		lJson = Object.entries(json);
-		populatePalettes();
-	})
-	.catch(function (error) {
-		showToast(error, true);
-	})
-	.finally(()=>{
-		if (callback) callback();
-	});
-}
-
-function loadFX(callback = null)
-{
-	var url = (loc?`http://${locip}`:'') + '/json/effects';
-
-	fetch(url, {
-		method: 'get'
-	})
-	.then(res => {
-		if (!res.ok) showErrorToast();
-		return res.json();
-	})
-	.then(json => {
-		clearErrorToast();
-		eJson = Object.entries(json);
-		populateEffects();
-	})
-	.catch(function (error) {
-		showToast(error, true);
-	})
-	.finally(()=>{
-		if (callback) callback();
-	});
-}
-
-function loadFXData(callback = null)
-{
-	var url = (loc?`http://${locip}`:'') + '/json/fxdata';
-
-	fetch(url, {
-		method: 'get'
-	})
-	.then(res => {
-		if (!res.ok) showErrorToast();
-		return res.json();
-	})
-	.then(json => {
-		clearErrorToast();
-		fxdata = json||[];
-		// add default value for Solid
-		fxdata.shift()
-		fxdata.unshift("@;!;");
-	})
-	.catch(function (error) {
-		fxdata = [];
-		showToast(error, true);
-	})
-	.finally(()=>{
-		if (callback) callback();
-		updateUI();
-	});
-}
-
-var pQL = [];
-function populateQL()
-{
-	var cn = "";
-	if (pQL.length > 0) {
-		pQL.sort((a,b) => (a[0]>b[0]));
-		for (var key of (pQL||[])) {
-			cn += `<button class="btn btn-xs psts" id="p${key[0]}qlb" title="${key[2]?key[2]:''}" onclick="setPreset(${key[0]});">${key[1]}</button>`;
-		}
-	}
-	gId('pql').innerHTML = cn;
-}
-
-function populatePresets()
-{
-	if (!pJson) {pJson={};return};
-	delete pJson["0"];
-	var cn = ""; //`<p class="label">All presets</p>`;
-	var arr = Object.entries(pJson);
-	arr.sort(cmpP);
-	pQL = [];
-	var is = [];
-	pNum = 0;
-	for (var key of (arr||[]))
-	{
-		if (!isObj(key[1])) continue;
-		let i = parseInt(key[0]);
-		var qll = key[1].ql;
-		if (qll) pQL.push([i, qll, pName(i)]);
-		is.push(i);
-
-		cn += `<div class="lstI c pres" id="p${i}o" onclick="setPreset(${i})">`;
-		//if (cfg.comp.pid) cn += `<div class="pid">${i}</div>`;
-		cn += `${isPlaylist(i)?"<i class='icons btn-icon'>&#xe139;</i>":""}<span class="lstIname">${pName(i)}</span></div>`;
-    	pNum++;
-	}
-	gId('pcont').innerHTML = cn;
-	updatePA();
-	populateQL();
-}
-
-function parseInfo() {
-	var li   = lastinfo;
-	var name = li.name;
-	gId('namelabel').innerHTML = name;
-//		if (name === "Dinnerbone") d.documentElement.style.transform = "rotate(180deg)";
-	if (li.live) name = "(Live) " + name;
-	if (loc)     name = "(L) " + name;
-	d.title     = name;
-	isRgbw      = li.leds.wv;
-	ledCount    = li.leds.count;
-	syncTglRecv = li.str;
-	maxSeg      = li.leds.maxseg;
-	pmt         = li.fs.pmt;
-	cct         = li.leds.cct;
-}
-
-function populateInfo(i)
-{
-	var cn="";
-	var heap = i.freeheap/1000;
-	heap = heap.toFixed(1);
-	var theap = (i.totalheap>0)?i.totalheap/1000:-1; theap = theap.toFixed(1); //WLEDMM - total heap is not available on 8266
-	var pwr = i.leds.pwr;
-	var pwru = "Not calculated";
-	if (pwr > 1000) {pwr /= 1000; pwr = pwr.toFixed((pwr > 10) ? 0 : 1); pwru = pwr + " A";}
-	else if (pwr > 0) {pwr = 50 * Math.round(pwr/50); pwru = pwr + " mA";}
-  	var urows="";
-	if (i.u) {
-		for (const [k, val] of Object.entries(i.u)) {
-			if (val[1])
-				urows += inforow(k,val[0],val[1]);
-			else
-				urows += inforow(k,val);
-		}
-	}
-	var vcn = "Kuuhaku";
-	if (i.ver.startsWith("0.14.")) vcn = "Hoshi";
-	if (i.ver.includes("-bl")) vcn = "Supāku";
-	if (i.cn) vcn = i.cn;
-	if (i.ver.includes("14.5.")) vcn = "Small Step";
-
-	//WLEDMM: add total heap and total PSRAM, and build number
-	//if (i.ver.includes("14.1-")) vcn = "Sitting Ducks"; // easter egg
-	//if (i.ver.includes("14.0-mdev")) vcn = "Lupo";
-	cn += `v${i.ver} &nbsp;<i>"${vcn}"</i><p><em>build ${i.vid}</em></p><table>
-${urows}
-${inforow("Build",i.vid)}
-${inforow("Signal strength",i.wifi.signal +"% ("+ i.wifi.rssi, " dBm)")}
-${inforow("Uptime",getRuntimeStr(i.uptime))}
-${inforow("Estimated current",pwru)}
-${inforow("Average FPS",i.leds.fps)}
-<!-- WLEDMM begin--> 
-<tr><td colspan=2><hr style="height:1px;border-width:0;color:SeaGreen;background-color:SeaGreen"></td></tr>
-${inforow("MAC address",i.mac)}
-${inforow("Filesystem",i.fs.u + "/" + i.fs.t + " kB (" +Math.round(i.fs.u*100/i.fs.t) + "%)")}
-${inforow("Environment",i.arch + " " + i.core + " (" + i.lwip + ")")}
-${theap>0?inforow("Total heap",theap," kB"):""}
-${i.minfreeheap?inforow("Max used heap",((i.totalheap-i.minfreeheap)/1000).toFixed(1)," kB"):""}
-${i.tpram?inforow("Total PSRAM",(i.tpram/1024).toFixed(1)," kB"):""}
-${i.psusedram?((i.tpram-i.psusedram)>16383?inforow("Max Used PSRAM",((i.tpram-i.psusedram)/1024).toFixed(1)," kB"):inforow("Max Used PSRAM",(i.tpram-i.psusedram)," B")):""}
-${i.e32model?inforow(i.e32model,i.e32cores +" core(s)"," "+i.e32speed+" Mhz"):""}
-${i.e32flash?inforow("Flash "+i.e32flash+" MB"+", mode "+i.e32flashmode+i.e32flashtext,i.e32flashspeed," Mhz"):""}
-<!-- WLEDMM end--> 
-</table>`;
-	gId('kv').innerHTML = cn;
-}
-
-function populateSegments(s)
-{
-	var cn = "";
-	segCount = (s.seg||[]).length;
-	lowestUnused = 0; lSeg = 0;
-
-	if (segCount > 1) {
-		for (var y = 0; y < segCount && y<4; y++)
-		{
-			var inst=s.seg[y];
-			let i = parseInt(inst.id);
-			powered[i] = inst.on;
-			if (i == lowestUnused) lowestUnused = i+1;
-			if (i > lSeg) lSeg = i;
-
-			cn +=
-`<div class="label h">${(inst.n&&inst.n!=='')?inst.n:('Segment '+y)}</div>
-<div>
-	<label class="check schkl">
-		&nbsp;
-		<input type="checkbox" id="seg${i}sel" onchange="selSeg(${i})" ${inst.sel ? "checked":""}>
-		<span class="checkmark schk"></span>
-	</label>
-	<div class="il">
-		<i class="icons slider-icon pwr ${powered[i] ? "act":""}" id="seg${i}pwr" onclick="setSegPwr(${i})" title="${inst.n}">&#xe08f;</i>
-		<div id="sliderSeg${i}Bri" class="sliderwrap il">
-			<input id="seg${i}bri" onchange="setSegBri(${i})" oninput="updateTrail(this)" max="255" min="1" type="range" value="${inst.bri}" />
-			<div class="sliderdisplay"></div>
-		</div>
-		<output class="sliderbubble"></output>
-	</div>
-</div>`;
-		}
-		//if (gId('buttonBri').className !== 'active') tglBri(true);
-	} else {
-		//tglBri(false);
-	}
-	//gId('buttonBri').style.display = (segCount > 1) ? "block" : "none";
-	gId('segcont').innerHTML = cn;
-	for (var i = 0; i < segCount && i<4; i++) updateTrail(gId(`seg${i}bri`));
-}
-
-function btype(b)
-{
-	switch (b) {
-		case 2:
-		case 32: return "ESP32";
-		case 1:
-		case 82: return "ESP8266";
-	}
-	return "?";
-}
-
-function bname(o)
-{
-	if (o.name=="WLED") return o.ip;
-	return o.name;
-}
-
-function populateNodes(i,n)
-{
-	var cn="";
-	var urows="";
-	var nnodes = 0;
-	if (n.nodes) {
-		n.nodes.sort((a,b) => (a.name).localeCompare(b.name));
-		for (var x=0;x<n.nodes.length;x++) {
-			var o = n.nodes[x];
-			if (o.name) {
-				var url = `<button class="btn tab" title="${o.ip}" onclick="location.assign('http://${o.ip}');">${bname(o)}</button>`;
-				urows += inforow(url,`${btype(o.type)}<br><i>${o.vid==0?"N/A":o.vid}</i>`);
-				nnodes++;
-			}
-		}
-	}
-	if (i.ndc < 0) cn += `Instance List is disabled.`;
-	else if (nnodes == 0) cn += `No other instances found.`;
-	cn += `<table class="infot">
-	${urows}
-	${inforow("Current instance:",i.name)}
-	</table>`;
-	gId('kn').innerHTML = cn;
-}
-
-function loadNodes()
-{
-	var url = (loc?`http://${locip}`:'') + '/json/nodes';
-	fetch(url, {
-		method: 'get'
-	})
-	.then(res => {
-		if (!res.ok) showToast('Could not load Node list!', true);
-		return res.json();
-	})
-	.then(json => {
-		clearErrorToast();
-		populateNodes(lastinfo, json);
-	})
-	.catch(function (error) {
-		showToast(error, true);
-		console.log(error);
-	});
-}
-
-function populateEffects()
-{
-	var effects = eJson;
-	var html = "";
-
-	effects.shift(); //remove solid
-	for (let i = 0; i < effects.length; i++) effects[i] = {id: effects[i][0], name:effects[i][1]};
-	effects.sort((a,b) => (a.name).localeCompare(b.name));
-	effects.unshift({
-		"id": 0,
-		"name": "Solid@;!;0"
-	});
-
-	for (let i = 0; i < effects.length; i++) {
-		// WLEDMM: add slider and color control to setEffect (used by requestjson)
-		if (effects[i].name.indexOf("RSVD") < 0) {
-			var posAt = effects[i].name.indexOf("@");
-			var extra = '';
-			if (posAt > 0)
-				extra = effects[i].name.substr(posAt);
-			else
-				posAt = 999;
-			html += generateListItemHtml(
-				'fx',
-				effects[i].id,
-				effects[i].name.substr(0,posAt),
-				'setEffect',
-				'','',
-				extra
-			);
-		}
-	}
-	gId('fxlist').innerHTML=html;
-}
-
-function populatePalettes()
-{
-	var palettes = lJson;
-	palettes.shift(); //remove default
-	for (let i = 0; i < palettes.length; i++) {
-		palettes[i] = {
-			"id": palettes[i][0],
-			"name": palettes[i][1]
-		};
-	}
-	palettes.sort((a,b) => (a.name).localeCompare(b.name));
-	palettes.unshift({
-		"id": 0,
-		"name": "Default",
-	});
-	var html = "";
-	for (let i = 0; i < palettes.length; i++) {
-		html += generateListItemHtml(
-			'palette',
-		    palettes[i].id,
-            palettes[i].name,
-            'setPalette',
-			`<div class="lstIprev"></div>`
-        );
-	}
-	gId('pallist').innerHTML=html;
-}
-
-function redrawPalPrev()
-{
-	let palettes = d.querySelectorAll('#pallist .lstI');
-	for (let i = 0; i < palettes.length; i++) {
-		let id = palettes[i].dataset.id;
-		let lstPrev = palettes[i].querySelector('.lstIprev');
-		if (lstPrev) {
-			lstPrev.style = genPalPrevCss(id);
-		}
-	}
-}
-
-function genPalPrevCss(id)
-{
-	if (!palettesData) return;
-
-	var paletteData = palettesData[id];
-	var previewCss = "";
-
-	if (!paletteData) return 'display: none';
-
-	// We need at least two colors for a gradient
-	if (paletteData.length == 1) {
-		paletteData[1] = paletteData[0];
-		if (Array.isArray(paletteData[1])) {
-			paletteData[1][0] = 255;
-		}
-	}
-
-	var gradient = [];
-	for (let j = 0; j < paletteData.length; j++) {
-		const element = paletteData[j];
-		let r;
-		let g;
-		let b;
-		let index = false;
-		if (Array.isArray(element)) {
-			index = element[0]/255*100;
-			r = element[1];
-			g = element[2];
-			b = element[3];
-		} else if (element == 'r') {
-			r = Math.random() * 255;
-			g = Math.random() * 255;
-			b = Math.random() * 255;
-		} else {
-			if (selColors) {
-				let e = element[1] - 1;
-				r = selColors[e][0];
-				g = selColors[e][1];
-				b = selColors[e][2];
-			}
-		}
-		if (index === false) {
-			index = j / paletteData.length * 100;
-		}
-
-		gradient.push(`rgb(${r},${g},${b}) ${index}%`);
-	}
-
-	return `background: linear-gradient(to right,${gradient.join()});`;
-}
-
-function generateOptionItemHtml(id, name)
-{
-    return `<option value="${id}">${name}</option>`;
-}
-
-function generateListItemHtml(listName, id, name, clickAction, extraHtml = '', extraClass = '', extraPar = '')
-{
-    return `<div class="lstI ${extraClass}" data-id="${id}" data-opt="${extraPar}" onClick="${clickAction}(${id})">
-	<div class="lstIcontent">
-		<span class="lstIname">
-			${name}
-		</span>
-	</div>
-	${extraHtml}
-</div>`;
-}
-
-//update the 'sliderdisplay' background div of a slider for a visual indication of slider position
-function updateTrail(e)
-{
-	if (e==null) return;
-	var max = e.hasAttribute('max') ? e.attributes.max.value : 255;
-	var perc = e.value * 100 / max;
-	perc = parseInt(perc);
-	if (perc < 50) perc += 2;
-	var val = `linear-gradient(90deg, var(--c-f) ${perc}%, var(--c-4) ${perc}%)`;
-	e.parentNode.getElementsByClassName('sliderdisplay')[0].style.background = val;
-	var b = e.parentNode.parentNode.getElementsByTagName('output')[0];
-	if (b) b.innerHTML = e.value;
-}
-
-//rangetouch slider function
-function toggleBubble(e)
-{
-	var b = e.target.parentNode.parentNode.getElementsByTagName('output')[0];
-	b.classList.toggle('sliderbubbleshow');
-}
-
-function updatePA()
-{
-	var ps = gEBCN("pres");
-	for (let i = 0; i < ps.length; i++) {
-		ps[i].classList.remove('selected');;
-	}
-	ps = gEBCN("psts");
-	for (let i = 0; i < ps.length; i++) {
-		ps[i].classList.remove('selected');;
-	}
-	if (currentPreset > 0) {
-        var acv = gId(`p${currentPreset}o`);
-		if (acv) acv.classList.add('selected');
-		acv = gId(`p${currentPreset}qlb`);
-		if (acv) acv.classList.add('selected');
+// My condolences to anyone trying to read this code.
+// Mostly vibe coded with Cursor + Sonnet 3.5
+
+// Add updatePeakPercentage as a global function at the top
+window.updatePeakPercentage = async () => {
+  try {
+    const response = await enqueueRequest(() => fetch(`${BASE_URL}/json/si`));
+    const newState = await response.json();
+    const audioSource = newState?.info?.u?.["Audio Source"]?.[1] || "";
+    const peakDisplay = document.getElementById('peak-display');
+    
+    if (peakDisplay) {
+      // Flash the text white
+      peakDisplay.style.color = '#ffffff';
+      
+      // Remove the leading " - " if present and display the message
+      const displayText = audioSource.replace(/^ - /, '');
+      peakDisplay.textContent = displayText;
+      
+      // Return to blue after a short delay
+      setTimeout(() => {
+        peakDisplay.style.color = '#007BFF';
+      }, 200);
     }
-}
+  } catch (err) {
+    console.error("Error updating peak percentage:", err);
+  }
+};
 
-function updateUI()
-{
-	gId('buttonPower').className = (isOn) ? "active":"";
+// Add rapid update function
+let rapidUpdateInterval = null;
+let isUpdating = false;
 
-	var sel = 0;
-	if (lJson && lJson.length) {
-		for (var i=0; i<lJson.length; i++) if (lJson[i].id == selectedPal) {sel = i; break;}
-		gId('palBtn').innerHTML = '<i class="icons">&#xe2b3;</i> ' + lJson[sel].name;
-	}
-	sel = 0;
-	if (eJson && eJson.length) {
-		for (var i=0; i<eJson.length; i++) if (eJson[i].id == selectedFx) {sel = i; break;}
-		var posAt = eJson[sel].name.indexOf("@");
-		if (posAt<=0) posAt=999;
-		gId('fxBtn').innerHTML = '<i class="icons">&#xe0e8;</i> ' + eJson[sel].name.substr(0,posAt);
-	}
-
-	updateTrail(gId('sliderBri'));
-	updateTrail(gId('sliderSpeed'));
-	updateTrail(gId('sliderIntensity'));
-
-	gId('wwrap').style.display = (isRgbw) ? "block":"none";
-	gId("wbal").style.display = (cct) ? "block":"none";
-	gId('kwrap').style.display = (cct) ? "none":"block";
-
-	updatePA();
-	redrawPalPrev();
-	updatePSliders();
-
-	var l = cfg.comp.labels; //l = false;
-	var e = d.querySelectorAll('.label');
-	for (var i=0; i<e.length; i++) e[i].style.display = l ? "block":"none";
-}
-
-function cmpP(a, b)
-{
-	if (!a[1].n) return (a[0] > b[0]);
-	// playlists follow presets
-	var name = (a[1].playlist ? '~' : ' ') + a[1].n;
-	return name.localeCompare((b[1].playlist ? '~' : ' ') + b[1].n, undefined, {numeric: true});
-}
-
-function makeWS() {
-	if (ws) return;
-	ws = new WebSocket('ws://'+(loc?locip:window.location.hostname)+'/ws');
-	ws.onmessage = (e)=>{
-		var json = JSON.parse(e.data);
-		if (json.leds) return; //liveview packet
-		clearTimeout(jsonTimeout);
-		jsonTimeout = null;
-		lastUpdate = new Date();
-		clearErrorToast();
-	  	gId('connind').style.backgroundColor = "var(--c-l)";
-		// json object should contain json.info AND json.state (but may not)
-		var i = json.info;
-		if (i) {
-			lastinfo = i;
-			parseInfo();
-			if (isInfo) populateInfo(i);
-		} else
-			i = lastinfo;
-		var s = json.state ? json.state : json;
-		readState(s);
-	};
-	ws.onclose = (e)=>{
-		gId('connind').style.backgroundColor = "var(--c-r)";
-		ws = null;
-		if (lastinfo.ws > -1) setTimeout(makeWS,500);
-	}
-	ws.onopen = (e)=>{
-		ws.send("{'v':true}");
-		reqsLegal = true;
-		clearErrorToast();
-	}
-}
-
-function readState(s,command=false)
-{
-	if (!s) return false;
-
-	isOn = s.on;
-	gId('sliderBri').value= s.bri;
-	nlA = s.nl.on;
-	nlDur = s.nl.dur;
-	nlTar = s.nl.tbri;
-	nlFade = s.nl.fade;
-	syncSend = s.udpn.send;
-	if (s.pl<0)	currentPreset = s.ps;
-	else currentPreset = s.pl;
-	tr = s.transition/10;
-
-	var selc=0; var ind=0;
-	populateSegments(s);
-	for (let i = 0; i < (s.seg||[]).length; i++)
-	{
-		if(s.seg[i].sel) {selc = ind; break;} ind++;
-	}
-	var i=s.seg[selc];
-	if (!i) {
-		showToast('No Segments!', true);
-		updateUI();
-		return;
-	}
+function startRapidUpdate() {
+  if (isUpdating) return;
+  isUpdating = true;
   
-	selColors = i.col;
-	var cd = gId('csl').children;
-	for (let e = cd.length-1; e >= 0; e--)
-	{
-		var r,g,b,w;
-		r = i.col[e][0];
-		g = i.col[e][1];
-		b = i.col[e][2];
-		if (isRgbw) w = i.col[e][3];
-		cd[e].style.backgroundColor = "rgb(" + r + "," + g + "," + b + ")";
-		if (isRgbw) whites[e] = parseInt(w);
-		selectSlot(csel);
-	}
-	gId('sliderW').value = whites[csel];
-	if (i.cct && i.cct>=0) gId("sliderA").value = i.cct;
-
-	gId('sliderSpeed').value = i.sx;
-	gId('sliderIntensity').value = i.ix;
-/*
-	gId('sliderC1').value  = i.f1x ? i.f1x : 0;
-	gId('sliderC2').value  = i.f2x ? i.f2x : 0;
-	gId('sliderC3').value  = i.f3x ? i.f3x : 0;
-*/
-	if (s.error && s.error != 0) {
-	  var errstr = "";
-	  switch (s.error) {
-		case 10:
-		  errstr = "Could not mount filesystem!";
-		  break;
-		case 11:
-		  errstr = "Not enough space to save preset!";
-		  break;
-		case 12:
-		  errstr = "Preset not found.";
-		  break;
-		case 13:
-		  errstr = "Missing IR.json.";
-		  break;
-		case 19:
-		  errstr = "A filesystem error has occurred.";
-		  break;
-		}
-	  showToast('Error ' + s.error + ": " + errstr, true);
-	}
-
-	selectedPal = i.pal;
-	selectedFx = i.fx;
-	updateUI();
+  // Clear any existing interval
+  if (rapidUpdateInterval) {
+    clearInterval(rapidUpdateInterval);
+  }
+  
+  // Update immediately
+  updatePeakPercentage();
+  
+  // Start rapid updates
+  rapidUpdateInterval = setInterval(updatePeakPercentage, 1000);
 }
 
-var jsonTimeout;
-var reqsLegal = false;
-
-function requestJson(command=null)
-{
-	gId('connind').style.backgroundColor = "var(--c-r)";
-	if (command && !reqsLegal) return; //stop post requests from chrome onchange event on page restore
-	if (!jsonTimeout) jsonTimeout = setTimeout(showErrorToast, 3000);
-	var req = null;
-	var url = (loc?`http://${locip}`:'') + '/json/si';
-	var useWs = (ws && ws.readyState === WebSocket.OPEN);
-	var type = command ? 'post':'get';
-	if (command) {
-		if (useWs || !command.ps) command.v = true; // force complete /json/si API response
-		command.time = Math.floor(Date.now() / 1000);
-		req = JSON.stringify(command);
-		if (req.length > 1000) useWs = false; //do not send very long requests over websocket
-	};
-
-	if (useWs) {
-		ws.send(req?req:'{"v":true}');
-		return;
-	} else if (command && command.ps) { //refresh UI if we don't use WS (async loading of presets)
-		setTimeout(requestJson,200);
-	}
-
-	fetch(url, {
-		method: type,
-		headers: {
-			"Content-type": "application/json; charset=UTF-8"
-		},
-		body: req
-	})
-	.then(res => {
-		if (!res.ok) showErrorToast();
-		return res.json();
-	})
-	.then(json => {
-		clearTimeout(jsonTimeout);
-		jsonTimeout = null;
-		lastUpdate = new Date();
-		clearErrorToast();
-		gId('connind').style.backgroundColor = "var(--c-g)";
-		if (!json) { showToast('Empty response', true); return; }
-		if (json.success) return;
-		if (json.info) {
-			lastinfo = json.info;
-			parseInfo();
-			if (isInfo) populateInfo(lastinfo);
-		}
-		var s = json.state ? json.state : json;
-		readState(s);
-		reqsLegal = true;
-	})
-	.catch(function (error) {
-		showToast(error, true);
-		console.log(error);
-	});
+function stopRapidUpdate() {
+  isUpdating = false;
+  if (rapidUpdateInterval) {
+    clearInterval(rapidUpdateInterval);
+    rapidUpdateInterval = null;
+  }
 }
 
-function togglePower()
-{
-	isOn = !isOn;
-	var obj = {"on": isOn};
-	requestJson(obj);
+var h = document.getElementsByTagName("head")[0];
+var l = document.createElement("script");
+l.type = "application/javascript";
+l.src = "iro.js";
+l.addEventListener("load", (e) => {
+  // Hide color picker by default
+  document.querySelector("#color-picker").style.display = "none";
+
+  var l = document.createElement("script");
+  l.type = "application/javascript";
+  l.src = "rangetouch.js";
+  l.addEventListener("load", (e) => {
+    // after rangetouch is loaded initialize global variable
+    ranges = RangeTouch.setup('input[type="range"]', {});
+    let stateCheck = setInterval(() => {
+      if (document.readyState === "complete") {
+        clearInterval(stateCheck);
+        // document ready, start processing UI
+        onLoad();
+      }
+    }, 100);
+  });
+  setTimeout(() => {
+    h.appendChild(l);
+  }, 100);
+});
+setTimeout(() => {
+  h.appendChild(l);
+}, 100);
+
+const BASE_URL =
+  window.location.protocol === "file:" ? "http://192.168.1.165" : "";
+
+// Add this at the top of your script, after the BASE_URL declaration
+let requestQueue = Promise.resolve(); // Initialize request queue
+
+// Helper function to add requests to the queue
+function enqueueRequest(requestFn) {
+  requestQueue = requestQueue.then(requestFn).catch((err) => {
+    // Continue the queue even if a request fails
+    return Promise.resolve();
+  });
+  return requestQueue;
 }
 
-function toggleInfo()
-{
-	if (isNodes) toggleNodes();
-	isInfo = !isInfo;
-	if (isInfo) requestJson();
-	gId('info').style.transform = (isInfo) ? "translateY(0px)":"translateY(100%)";
-	gId('buttonI').className = (isInfo) ? "active":"";
+// In-memory storage for JSON data
+let jsonData = {
+  patterns: {},
+  effects: [],
+  palettes: [],
+  fxdata: {},
+  currentState: {},
+  effectIndices: {},
+};
+
+// Add these new functions before loadAllData()
+let palettesData = null;
+
+function unGamma(val, gamma) {
+  return Math.round(Math.pow(val / 255.0, 1.0 / gamma) * 255.0);
 }
 
-function toggleNodes()
-{
-	if (isInfo) toggleInfo();
-	isNodes = !isNodes;
-	if (isNodes) loadNodes();
-	gId('nodes').style.transform = (isNodes) ? "translateY(0px)":"translateY(100%)";
-	gId('buttonNodes').className = (isNodes) ? "active":"";
-}
-/*
-function tglBri(b=null)
-{
-	if (b===null) b = gId(`briwrap`).style.display === "block";
-	gId('briwrap').style.display = !b ? "block":"none";
-	gId('buttonBri').className = !b ? "active":"";
-	size();
-}
-*/
-function tglCP()
-{
-	var p = gId('buttonCP').className === "active";
-	gId('buttonCP').className = !p ? "active":"";
-	gId('picker').style.display = !p ? "block":"none";
-	gId('vwrap').style.display = !p ? "block":"none";
-	gId('rgbwrap').style.display = !p ? "block":"none";
-	var csl = gId('Slots').style.display === "block";
-	gId('Slots').style.display = !csl ? "block":"none";
-	//var ps = gId(`Presets`).style.display === "block";
-	//gId('Presets').style.display = !ps ? "block":"none";
-}
+// Simplified genPalPrevCss with focused debugging
+function genPalPrevCss(paletteData) {
+  if (!paletteData) return "display: none";
 
-function tglCs(i)
-{
-	var pss = gId(`p${i}cstgl`).checked;
-	gId(`p${i}o1`).style.display = pss? "block" : "none";
-	gId(`p${i}o2`).style.display = !pss? "block" : "none";
-}
+  if (paletteData.length == 1) {
+    paletteData = [...paletteData, paletteData[0]];
+  }
 
-function selSeg(s)
-{
-	var sel = gId(`seg${s}sel`).checked;
-	var obj = {"seg": {"id": s, "sel": sel}};
-	requestJson(obj);
-}
+  var gradient = [];
 
-function tglPalDropdown()
-{
-	var p = gId('palDropdown').style;
-	p.display = (p.display==='block'?'none':'block');
-	gId('fxDropdown').style.display = 'none';
-	if (p.display==='block')
-		gId('palDropdown').scrollIntoView({
-			behavior: 'smooth',
-			block: 'center',
-		});
+  for (let j = 0; j < paletteData.length; j++) {
+    const e = paletteData[j];
+    let r, g, b;
+    let index = false;
+
+    if (Array.isArray(e)) {
+      index = Math.round((e[0] / 255) * 100);
+      r = unGamma(e[1], 2.5);
+      g = unGamma(e[2], 2.3);
+      b = unGamma(e[3], 2.4);
+    } else if (e === "r") {
+      r = Math.floor(Math.random() * 256);
+      g = Math.floor(Math.random() * 256);
+      b = Math.floor(Math.random() * 256);
+    } else if (typeof e === "string" && e.startsWith("c")) {
+      const slotNum = parseInt(e.substring(1)) - 1;
+      const currentColors = jsonData.currentState?.state?.seg?.[0]?.col || [];
+
+      if (currentColors[slotNum]) {
+        [r, g, b] = currentColors[slotNum];
+      } else {
+        r = g = b = 255; // Default to white instead of gray
+      }
+    } else if (typeof e === "object") {
+      r = e.r;
+      g = e.g;
+      b = e.b;
+    } else {
+      r = g = b = 255; // Default to white instead of gray
+    }
+
+    if (index === false) {
+      index = Math.round((j / (paletteData.length - 1)) * 100);
+    }
+
+    gradient.push(`rgb(${r},${g},${b}) ${index}%`);
+  }
+
+  return `background: linear-gradient(to right,${gradient.join()});`;
 }
 
-function tglFxDropdown()
-{
-	var p = gId('fxDropdown').style;
-	p.display = (p.display==='block'?'none':'block');
-	gId('palDropdown').style.display = 'none';
-	if (p.display==='block')
-		gId('fxDropdown').scrollIntoView({
-			behavior: 'smooth',
-			block: 'center',
-		});
+// Update renderPalettes to use simplified debugging
+function renderPalettes() {
+  const list = document.getElementById("color-effects-list");
+  list.innerHTML = "";
+
+  // Get current palette index from state
+  const currentPaletteIndex = jsonData.currentState?.state?.seg?.[0]?.pal;
+
+  // Create array of palette objects with index to maintain original index after sorting
+  const sortedPalettes = jsonData.palettes.map((name, index) => ({
+    name,
+    index,
+  }));
+
+  // Sort alphabetically, ignoring case and special characters at start
+  sortedPalettes.sort((a, b) => {
+    if (a.name === "Default") return -1;
+    if (b.name === "Default") return 1;
+
+    const nameA = a.name.replace(/^[*~]/, "").toLowerCase();
+    const nameB = b.name.replace(/^[*~]/, "").toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+
+  sortedPalettes.forEach(({ name: palette, index }) => {
+    const li = document.createElement("li");
+    li.classList.add("list-item");
+    li.textContent = palette;
+    li.style.position = "relative";
+    li.dataset.paletteIndex = index;
+
+    // Mark as active if this is the current palette
+    if (index === currentPaletteIndex) {
+      li.classList.add("active");
+      // Scroll to the active palette after a short delay to ensure rendering is complete
+      setTimeout(() => {
+        li.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+
+    // Add palette preview
+    const preview = document.createElement("div");
+    preview.className = "lstIprev";
+
+    // Get palette data and handle color slots
+    if (palettesData && palettesData[index]) {
+      const paletteData = palettesData[index];
+      preview.style = genPalPrevCss(paletteData);
+    }
+
+    // Add click handler for palette selection
+    li.onclick = async () => {
+      // Deselect all other palettes
+      document
+        .querySelectorAll("#color-effects-list .list-item")
+        .forEach((item) => {
+          item.classList.remove("active");
+        });
+      // Select this palette
+      li.classList.add("active");
+
+      // Send palette selection to API
+      try {
+        await enqueueRequest(() =>
+          fetch(`${BASE_URL}/json/si`, {
+            method: "POST",
+            body: JSON.stringify({
+              seg: {
+                pal: index,
+              },
+            }),
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+
+        // Update the current state with the new palette
+        if (!jsonData.currentState.state) {
+          jsonData.currentState.state = {};
+        }
+        jsonData.currentState.state.pal = index;
+
+        // Update debug info if we're on the Options tab
+        const optionsTab = document.getElementById("tab4-content");
+        if (optionsTab.classList.contains("active")) {
+          const effectsList = document.getElementById("effects-list");
+          const activeEffect = effectsList.querySelector(".active");
+          if (activeEffect) {
+            const effectIndex = Array.from(effectsList.children).indexOf(
+              activeEffect
+            );
+            renderEffectDetails(effectIndex);
+          }
+        }
+      } catch (err) {}
+    };
+
+    li.appendChild(preview);
+    list.appendChild(li);
+  });
 }
 
-function setSegPwr(s)
-{
-	var obj = {"seg": {"id": s, "on": !powered[s]}};
-	requestJson(obj);
+// Add these variables near the top with other variables
+var lastinfo = {};
+
+// Add this function before loadPalettesData
+function parseInfo(i) {
+  lastinfo = i;
+  // We only need vid from info for palette data
 }
 
-function setSegBri(s)
-{
-	var obj = {"seg": {"id": s, "bri": parseInt(gId(`seg${s}bri`).value)}};
-	requestJson(obj);
+// Add this near the top with other state variables
+let brightnessPresets = [20, 50, 80, 120, 150]; // Default values until we load from config
+
+// Update loadAllData to parse info from si response
+async function loadAllData() {
+  try {
+    // Helper function to add request to queue
+    const queuedFetch = (url) => {
+      return enqueueRequest(async () => {
+        const response = await fetch(`${BASE_URL}${url}`);
+        return response.json();
+      });
+    };
+
+    // Sequential fetches that wait for previous request to complete
+    const presets = await queuedFetch("/presets.json");
+    const si = await queuedFetch("/json/si");
+    const effects = await queuedFetch("/json/effects");
+    const fxdata = await queuedFetch("/json/fxdata");
+    const palettes = await queuedFetch("/json/palettes");
+    const config = await queuedFetch("/cfg.json");
+
+    // Get brightness presets from config
+    if (config?.um?.Borealis?.['brightness-values']) {
+      brightnessPresets = config.um.Borealis['brightness-values'];
+    }
+
+    // Parse info from si response
+    if (si.info) parseInfo(si.info);
+
+    jsonData.palettes = palettes;
+    jsonData.patterns = presets;
+    jsonData.currentState = si;
+    jsonData.effects = effects.filter((effect) => effect !== "RSVD").sort();
+    jsonData.fxdata = fxdata;
+
+    // Create a mapping of sorted effect names to their original indices
+    jsonData.effectIndices = {};
+    effects.forEach((effect, index) => {
+      if (effect !== "RSVD") {
+        jsonData.effectIndices[effect] = index;
+      }
+    });
+
+    // Load palette data and render immediately
+    loadPalettesData(() => {
+      const colorEffectsList = document.getElementById("color-effects-list");
+      if (colorEffectsList) {
+        colorEffectsList.classList.add("visible");
+        renderPalettes();
+        // Show color picker and set up initial color controls
+        const colorPicker = document.getElementById("color-picker");
+        if (colorPicker) {
+          colorPicker.style.display = "block";
+        }
+      }
+    });
+
+    renderPatterns();
+    renderEffects();
+
+    // Get current effect from state and trigger its selection
+    const currentEffectId = si.state?.seg?.[0]?.fx;
+    if (currentEffectId !== undefined) {
+      // Find the effect name that corresponds to this ID
+      const effectName = jsonData.effects.find(
+        (effect) => jsonData.effectIndices[effect] === currentEffectId
+      );
+
+      if (effectName) {
+        const effectIndex = jsonData.effects.indexOf(effectName);
+
+        // Get effect metadata and set up color controls
+        const effectData = jsonData.fxdata[currentEffectId];
+        const metadata = parseEffectMetadata(effectData);
+        const currentColors = si.state.seg[0].col || [
+          [255, 0, 0],
+          [0, 0, 255],
+        ];
+        metadata.defaults = currentColors.map(
+          (col) =>
+            `#${col[0].toString(16).padStart(2, "0")}${col[1]
+              .toString(16)
+              .padStart(2, "0")}${col[2].toString(16).padStart(2, "0")}`
+        );
+
+        // Update color controls
+        setupColorControls(metadata);
+
+        // Update effect details/options
+        renderEffectDetails(effectIndex);
+      }
+    }
+  } catch (err) {}
 }
 
-function setEffect(ind = 0)
-{
-	tglFxDropdown();
-	var obj = {"seg": {"fx": parseInt(ind), "fxdef":true, "fxdef2":false}}; // fxdef sets effect parameters to default values, TODO add client setting
-	requestJson(obj);
+// Update loadPalettesData to handle paged loading
+function loadPalettesData(callback = null) {
+  if (palettesData) return;
+  const lsKey = "wledPalx";
+  var lsPalData = localStorage.getItem(lsKey);
+  if (lsPalData) {
+    try {
+      var d = JSON.parse(lsPalData);
+      if (d && d.vid == lastinfo.vid) {
+        palettesData = d.p;
+        if (callback) callback();
+        return;
+      }
+    } catch (e) {}
+  }
+
+  palettesData = {};
+  getPalettesData(0, () => {
+    localStorage.setItem(
+      lsKey,
+      JSON.stringify({
+        p: palettesData,
+        vid: lastinfo.vid,
+      })
+    );
+    redrawPalPrev();
+    if (callback) setTimeout(callback, 99);
+  });
 }
 
-function setPalette(paletteId = null)
-{
-	tglPalDropdown();
-	var obj = {"seg": {"pal": paletteId}};
-	requestJson(obj);
+function getPalettesData(page, callback) {
+  queuedFetch(`/json/palx?page=${page}`)
+    .then((json) => {
+      palettesData = Object.assign({}, palettesData, json.p);
+      if (page < json.m)
+        setTimeout(() => {
+          getPalettesData(page + 1, callback);
+        }, 50);
+      else callback();
+    })
+    .catch((error) => {
+      console.error(error);
+    });
 }
 
-function setBri()
-{
-	var obj = {"bri": parseInt(gId('sliderBri').value)};
-	requestJson(obj);
+// Add this shared function before renderPatterns
+function createHoldToDeleteHandler(element, onDelete, onShortPress, preventDefault = false) {
+  let pressTimer;
+  let isLongPress = false;
+  let touchStartTime;
+  let animationFrame;
+  let startTime;
+  let isTouchDevice = false;
+  let isMouseDown = false;
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let hasMoved = false;
+
+  // Add transition CSS
+  element.style.transition = "background-color 0.2s";
+
+  function updateBackground() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / 1000, 1); // 1 second duration
+
+    // Interpolate between blue (#007BFF) and red (#FF0000)
+    const r = Math.round(0x00 + (0xff - 0x00) * progress);
+    const g = Math.round(0x7b * (1 - progress));
+    const b = Math.round(0xff * (1 - progress));
+
+    element.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+
+    if (progress < 1) {
+      animationFrame = requestAnimationFrame(updateBackground);
+    }
+  }
+
+  function handleMouseDown(e) {
+    if (isTouchDevice || e.buttons !== 1) return; // Only handle left mouse button
+    isMouseDown = true;
+    
+    startTime = Date.now();
+    updateBackground();
+
+    pressTimer = setTimeout(() => {
+      isLongPress = true;
+      onDelete();
+    }, 1000);
+  }
+
+  function handleMouseUp(e) {
+    if (!isMouseDown) return;
+    isMouseDown = false;
+    
+    clearTimeout(pressTimer);
+    cancelAnimationFrame(animationFrame);
+    element.style.backgroundColor = ""; // Reset color
+    
+    if (!isLongPress) {
+      onShortPress();
+    }
+    isLongPress = false;
+  }
+
+  function handleMouseLeave() {
+    if (!isMouseDown) return;
+    isMouseDown = false;
+    
+    clearTimeout(pressTimer);
+    cancelAnimationFrame(animationFrame);
+    element.style.backgroundColor = ""; // Reset color
+    isLongPress = false;
+  }
+
+  function handleTouchStart(e) {
+    if (preventDefault) e.preventDefault();
+    isTouchDevice = true;
+    touchStartTime = Date.now();
+    startTime = Date.now();
+    hasMoved = false;
+    
+    // Store initial touch position
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    
+    updateBackground();
+
+    pressTimer = setTimeout(() => {
+      isLongPress = true;
+      onDelete();
+    }, 1000);
+  }
+
+  function handleTouchMove(e) {
+    if (!touchStartX || !touchStartY) return;
+    
+    const touchX = e.touches[0].clientX;
+    const touchY = e.touches[0].clientY;
+    
+    // Calculate distance moved
+    const deltaX = Math.abs(touchX - touchStartX);
+    const deltaY = Math.abs(touchY - touchStartY);
+    
+    // If moved more than 10 pixels in any direction, consider it a scroll
+    if (deltaX > 10 || deltaY > 10) {
+      hasMoved = true;
+      clearTimeout(pressTimer);
+      cancelAnimationFrame(animationFrame);
+      element.style.backgroundColor = ""; // Reset color
+    }
+  }
+
+  function handleTouchEnd(e) {
+    clearTimeout(pressTimer);
+    cancelAnimationFrame(animationFrame);
+    element.style.backgroundColor = ""; // Reset color
+    
+    if (!isLongPress && !hasMoved) {
+      onShortPress();
+    }
+    isLongPress = false;
+    hasMoved = false;
+    touchStartX = 0;
+    touchStartY = 0;
+  }
+
+  // Add event listeners
+  element.addEventListener("mousedown", handleMouseDown);
+  element.addEventListener("mouseup", handleMouseUp);
+  element.addEventListener("mouseleave", handleMouseLeave);
+  
+  element.addEventListener("touchstart", handleTouchStart);
+  element.addEventListener("touchmove", handleTouchMove);
+  element.addEventListener("touchend", handleTouchEnd);
+  element.addEventListener("touchcancel", handleTouchEnd);
 }
 
-function setSpeed()
-{
-	var obj = {"seg": {"sx": parseInt(gId('sliderSpeed').value)}};
-	requestJson(obj);
+// Update createPatternItem to use the shared handler
+function createPatternItem({ id, name }) {
+  const li = document.createElement("li");
+  li.classList.add("list-item");
+  // Split name and ID, then add span for ID
+  const nameWithoutId = name.replace(/ \(\d+\)$/, '');
+  li.innerHTML = `${nameWithoutId}<span class="pattern-id">(${id})</span>`;
+  if (id == currentPattern) {
+    li.classList.add("active");
+  }
+
+  createHoldToDeleteHandler(
+    li,
+    () => deletePattern(id, name),
+    () => changePattern(id)
+  );
+
+  return li;
 }
 
-function setIntensity()
-{
-	var obj = {"seg": {"ix": parseInt(gId('sliderIntensity').value)}};
-	requestJson(obj);
+// Update renderPatterns to remove modal creation code
+function renderPatterns() {
+  const list = document.getElementById("pattern-list");
+  const currentPattern = jsonData.currentState.state.ps;
+
+  list.innerHTML = "";
+
+  // Split patterns into three groups
+  const group1Patterns = [];
+  const group2Patterns = [];
+  const group3Patterns = [];
+
+  Object.entries(jsonData.patterns).forEach(([id, item]) => {
+    if (item.n) {
+      const patternObj = { id, name: `${item.n} (${id})` };
+      if (id < 100) {
+        group1Patterns.push(patternObj);
+      } else if (id < 200) {
+        group2Patterns.push(patternObj);
+      } else if (id < 250) {
+        group3Patterns.push(patternObj);
+      }
+    }
+  });
+
+  function createPatternItem({ id, name }) {
+    const li = document.createElement("li");
+    li.classList.add("list-item");
+    // Split name and ID, then add span for ID
+    const nameWithoutId = name.replace(/ \(\d+\)$/, '');
+    li.innerHTML = `${nameWithoutId}<span class="pattern-id">(${id})</span>`;
+    if (id == currentPattern) {
+      li.classList.add("active");
+    }
+
+    createHoldToDeleteHandler(
+      li,
+      () => deletePattern(id, name),
+      () => changePattern(id)
+    );
+
+    return li;
+  }
+
+  // Add Group 1 patterns
+  if (group1Patterns.length) {
+    const group1Header = document.createElement("div");
+    group1Header.className = "pattern-group-header";
+    group1Header.textContent = "Group 1";
+    list.appendChild(group1Header);
+    group1Patterns.forEach((pattern) => {
+      list.appendChild(createPatternItem(pattern));
+    });
+  }
+
+  // Add Group 2 patterns
+  if (group2Patterns.length) {
+    const group2Header = document.createElement("div");
+    group2Header.className = "pattern-group-header";
+    group2Header.textContent = "Group 2";
+    list.appendChild(group2Header);
+    group2Patterns.forEach((pattern) => {
+      list.appendChild(createPatternItem(pattern));
+    });
+  }
+
+  // Add Group 3 patterns
+  if (group3Patterns.length) {
+    const group3Header = document.createElement("div");
+    group3Header.className = "pattern-group-header";
+    group3Header.textContent = "Group 3";
+    list.appendChild(group3Header);
+    group3Patterns.forEach((pattern) => {
+      list.appendChild(createPatternItem(pattern));
+    });
+  }
 }
 
-function setLor(i)
-{
-	var obj = {"lor": i};
-	requestJson(obj);
+// Render effects in tab 2 (sorted and filtered)
+function renderEffects() {
+  const list = document.getElementById("effects-list");
+  list.innerHTML = "";
+
+  // Get current effect index from state
+  const currentEffectIndex = jsonData.currentState?.state?.seg?.[0]?.fx;
+
+  jsonData.effects.forEach((effect, index) => {
+    const li = document.createElement("li");
+    li.classList.add("list-item");
+
+    // Get effect metadata and render name with symbols
+    const effectData = jsonData.fxdata[jsonData.effectIndices[effect]];
+    const metadata = parseEffectMetadata(effectData);
+    li.textContent = renderEffectName(effect, metadata);
+
+    // Check if this is the current effect
+    if (jsonData.effectIndices[effect] === currentEffectIndex) {
+      li.classList.add("active");
+    }
+
+    createHoldToDeleteHandler(
+      li,
+      () => {
+        if (confirm(`Are you sure you want to delete effect "${effect}"?`)) {
+          // TODO: Implement effect deletion if needed
+          console.log("Effect deletion not implemented yet");
+        }
+      },
+      async () => {
+        // Deselect all other effects
+        document.querySelectorAll("#effects-list .list-item").forEach((item) => {
+          item.classList.remove("active");
+        });
+        // Select this effect
+        li.classList.add("active");
+
+        // Update pattern list - select Custom button and deselect others
+        document.querySelectorAll("#pattern-list .list-item").forEach((item) => {
+          item.classList.remove("active");
+        });
+        const customButton = document.querySelector(
+          "#pattern-list .list-item:nth-child(2)"
+        );
+        if (customButton) {
+          customButton.classList.add("active");
+        }
+
+        // Get effect metadata and set up color controls
+        const effectData = jsonData.fxdata[jsonData.effectIndices[effect]];
+        const metadata = parseEffectMetadata(effectData);
+        const currentColors = jsonData.currentState?.state?.seg?.[0]?.col || [
+          [255, 0, 0],
+          [0, 0, 255],
+        ];
+        metadata.defaults = currentColors.map(
+          (col) =>
+            `#${col[0].toString(16).padStart(2, "0")}${col[1]
+              .toString(16)
+              .padStart(2, "0")}${col[2].toString(16).padStart(2, "0")}`
+        );
+
+        // Update color controls
+        setupColorControls(metadata);
+
+        // First, ensure we're in a known state by turning on the LED strip
+        await enqueueRequest(() =>
+          fetch(`${BASE_URL}/json`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              on: true,
+              bri: 128,
+              v: true
+            }),
+          })
+        );
+
+        // Then send effect with options
+        try {
+          await enqueueRequest(() =>
+            fetch(`${BASE_URL}/json/si`, {
+              method: "POST",
+              body: JSON.stringify({
+                seg: {
+                  fx: jsonData.effectIndices[effect],
+                  col: currentColors,
+                },
+                v: true
+              }),
+              headers: { "Content-Type": "application/json" },
+            })
+          );
+
+          // Fetch updated state to get the current effect options
+          const stateResponse = await enqueueRequest(() => 
+            fetch(`${BASE_URL}/json/state?v=true`)
+          );
+          const newState = await stateResponse.json();
+          jsonData.currentState = newState;
+
+          // Update local state
+          if (!jsonData.currentState.state) {
+            jsonData.currentState.state = {};
+          }
+          if (!jsonData.currentState.state.seg) {
+            jsonData.currentState.state.seg = [{}];
+          }
+          jsonData.currentState.state.seg[0].fx = jsonData.effectIndices[effect];
+          jsonData.currentState.state.seg[0].col = currentColors;
+
+          // Update effect details with new state
+          renderEffectDetails(index);
+        } catch (err) {
+          console.error("Error setting effect:", err);
+        }
+      }
+    );
+
+    list.appendChild(li);
+  });
+
+  // Scroll to active effect after rendering
+  requestAnimationFrame(() => {
+    const activeEffect = list.querySelector(".active");
+    if (activeEffect) {
+      activeEffect.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  });
 }
 
-function setPreset(i)
-{
-	var obj = {"ps": i};
-	if (isPlaylist(i)) obj.on = true;
-	showToast("Loading preset " + pName(i) +" (" + i + ")");
-	requestJson(obj);
+// Add this function to parse effect metadata
+function parseEffectMetadata(metadata) {
+  if (!metadata) return null;
+
+  // If metadata is directly a string (not in an object), use it directly
+  const metadataString =
+    typeof metadata === "string" ? metadata : metadata.metadata;
+  if (!metadataString) return null;
+
+  const sections = metadataString.split(";");
+  const result = {
+    parameters: [],
+    colors: [],
+    palette: null,
+    flags: [],
+    defaults: {},
+  };
+
+  // Parse parameters section
+  if (sections[0]) {
+    const params = sections[0].split(",");
+    params.forEach((param) => {
+      if (param === "!") {
+        // Use default label
+        if (result.parameters.length === 0)
+          result.parameters.push({ id: "sx", label: "Speed" });
+        else if (result.parameters.length === 1)
+          result.parameters.push({ id: "ix", label: "Intensity" });
+        else if (result.parameters.length >= 2)
+          result.parameters.push({
+            id: `c${result.parameters.length - 1}`,
+            label: `Custom ${result.parameters.length - 1}`,
+          });
+      } else if (param) {
+        // Custom label
+        if (result.parameters.length === 0)
+          result.parameters.push({ id: "sx", label: param });
+        else if (result.parameters.length === 1)
+          result.parameters.push({ id: "ix", label: param });
+        else if (result.parameters.length >= 2)
+          result.parameters.push({
+            id: `c${result.parameters.length - 1}`,
+            label: param,
+          });
+      }
+    });
+  }
+
+  // Parse colors section (if exists)
+  if (sections[1]) {
+    result.colors = sections[1].split(",").filter((c) => c);
+  }
+
+  // Parse palette requirement (if exists)
+  if (sections[2]) {
+    result.palette = sections[2] === "!" ? "required" : sections[2];
+  }
+
+  // Parse flags (if exists)
+  if (sections[3]) {
+    const flagStr = sections[3];
+    if (flagStr.includes("0")) result.flags.push("0d");
+    if (flagStr.includes("1")) result.flags.push("1d");
+    if (flagStr.includes("1.5d")) result.flags.push("1.5d");
+    if (flagStr.includes("2")) result.flags.push("2d");
+    if (flagStr.includes("v")) result.flags.push("volume");
+    if (flagStr.includes("f")) result.flags.push("frequency");
+  }
+
+  // Parse defaults (if exists)
+  if (sections[4]) {
+    const defaults = sections[4].split(",");
+    defaults.forEach((def) => {
+      const [key, value] = def.split("=");
+      result.defaults[key] = value;
+    });
+  }
+
+  return result;
 }
 
-function selectSlot(b)
-{
-	csel = b;
-	var cd = gId('csl').children;
-	for (let i = 0; i < cd.length; i++) cd[i].classList.remove('xxs-w');
-	cd[b].classList.add('xxs-w');
-	setPicker(cd[b].style.backgroundColor);
-	gId('sliderW').value = whites[b];
-	redrawPalPrev();
-	updatePSliders();
+// Add new function to render effect name with symbols
+function renderEffectName(effect, metadata) {
+  let displayName = effect + " ";
+
+  if (metadata) {
+    // Add flags symbols
+    if (metadata.flags) {
+      if (metadata.flags.includes("0d")) displayName += "•"; // 0D effects (PWM & On/Off)
+      if (metadata.flags.includes("1d") || metadata.flags.includes("1.5d"))
+        displayName += "⋮"; // 1D effects
+      if (metadata.flags.includes("2d")) displayName += "▦"; // 2D effects
+      if (metadata.flags.includes("volume")) displayName += "♪"; // Volume effects
+      if (metadata.flags.includes("frequency")) displayName += "♫"; // Frequency effects
+    }
+
+    // Add palette symbol if effect uses palette
+    if (metadata.palette) {
+      displayName += "🎨"; // Palette indicator
+    }
+  }
+
+  return displayName;
 }
 
-var lasth = 0;
-function pC(col)
-{
-	if (col == "rnd") {
-		col = {h: 0, s: 0, v: 100};
-		col.s = Math.floor((Math.random() * 50) + 50);
-		do {
-			col.h = Math.floor(Math.random() * 360);
-		} while (Math.abs(col.h - lasth) < 50);
-		lasth = col.h;
-	}
-	setPicker(col);
-	setColor(0);
+// Update renderEffectDetails to include debug information
+function renderEffectDetails(effectId) {
+  const details = document.getElementById("effect-details");
+  const effect = jsonData.effects[effectId];
+  const effectData = jsonData.fxdata[jsonData.effectIndices[effect]];
+  const metadata = parseEffectMetadata(effectData);
+
+  // Get current effect options from state
+  const currentOptions = jsonData.currentState?.state?.seg?.[0] || {};
+  const currentBrightness = jsonData.currentState?.state?.bri || 128;
+  const currentAudioGain = jsonData.currentState?.info?.u?.["Audio Input Level"]?.[0]?.match(/value=(\d+)/)?.[1] || 0;
+  const currentPeak = jsonData.currentState?.info?.u?.["Audio Source"]?.[1]?.match(/peak (\d+)%/)?.[1] || 0;
+
+  // Function to start/stop peak updates based on visibility
+  const handlePeakUpdates = () => {
+    const isMobile = window.innerWidth <= 1200;
+    const isOptionsTab = document.getElementById('tab4-content').classList.contains('active');
+    const isVisible = !isMobile || (isMobile && isOptionsTab);
+
+    if (isVisible) {
+      // Start updates if not already running
+      if (!peakUpdateInterval) {
+        updatePeakPercentage(); // Initial update
+        peakUpdateInterval = setInterval(updatePeakPercentage, 2000);
+      }
+    } else {
+      // Stop updates if running
+      if (peakUpdateInterval) {
+        clearInterval(peakUpdateInterval);
+        peakUpdateInterval = null;
+      }
+    }
+  };
+
+  // Set up visibility observer
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        handlePeakUpdates();
+      } else {
+        if (peakUpdateInterval) {
+          clearInterval(peakUpdateInterval);
+          peakUpdateInterval = null;
+        }
+      }
+    });
+  }, { threshold: 0.1 });
+
+  // Get effect name with symbols
+  const effectName = renderEffectName(effect, metadata);
+
+  // Create parameter controls HTML
+  let parameterControls = "";
+  if (metadata?.parameters?.length > 0) {
+    parameterControls = `
+      <div style="margin-bottom: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; border: 1px solid #3d3d3d;">
+        <div style="margin-bottom: 10px; font-weight: bold;">Effect Parameters:</div>
+        ${metadata.parameters
+          .map(
+            (param) => `
+          <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+            <label style="flex: 0 0 100px; color: white;">
+              ${param.label}
+            </label>
+            <input type="range" 
+                   id="${param.id}" 
+                   min="0" 
+                   max="255" 
+                   style="flex: 1;"
+                   value="${currentOptions[param.id] || metadata.defaults[param.id] || 128}"
+            >
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  // Add brightness control box
+  const brightnessControl = `
+    <div style="margin-bottom: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; border: 1px solid #3d3d3d;">
+      <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: bold;">Brightness:</div>
+        <div id="brightness-warning-container"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <input type="range" 
+               id="brightness" 
+               min="0" 
+               max="255" 
+               style="width: 100%;"
+               value="${currentBrightness}"
+        >
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          ${brightnessPresets.map((value, index) => `
+            <button onclick="setBrightness(${value})" 
+                    style="flex: 1; min-width: 50px; padding: 8px; background: ${currentBrightness === value ? '#007BFF' : '#2d2d2d'}; 
+                           color: white; border: 1px solid #3d3d3d; border-radius: 4px; cursor: pointer;">
+              ${index + 1}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Add audio gain control box
+  const audioGainControl = `
+    <div style="margin-bottom: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; border: 1px solid #3d3d3d;">
+      <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: bold; cursor: pointer;" onclick="updatePeakPercentage()">Audio Gain:</div>
+        <div id="peak-display" 
+             style="color: #007BFF; cursor: pointer; transition: color 0.2s ease;" 
+             onclick="startRapidUpdate()"
+             onmouseleave="stopRapidUpdate()"
+             ontouchstart="startRapidUpdate()"
+             ontouchend="stopRapidUpdate()">peak ${currentPeak}%</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <input type="range" 
+               id="audioGain" 
+               min="0" 
+               max="255" 
+               style="width: 100%;"
+               value="${currentAudioGain}"
+        >
+      </div>
+    </div>
+  `;
+
+  // Only show Expand FX if effect is NOT 2D
+  const showExpandFx = !metadata?.flags?.includes("2d");
+  const expandFxHtml = showExpandFx
+    ? `
+    <div style="display: flex; align-items: center; margin-bottom: 15px; gap: 10px;">
+      <label style="flex: 0 0 100px;">Expand FX:</label>
+      <select id="m12" style="width: 100%; padding: 8px; background: #2d2d2d; color: white; border: 1px solid #3d3d3d; border-radius: 4px; box-sizing: border-box; height: 36px;">
+        <option value="0" ${currentOptions.m12 === 0 ? "selected" : ""}>Pixels</option>
+        <option value="1" ${currentOptions.m12 === 1 ? "selected" : ""}>Bar</option>
+        <option value="2" ${currentOptions.m12 === 2 ? "selected" : ""}>Arc</option>
+        <option value="3" ${currentOptions.m12 === 3 ? "selected" : ""}>Corner</option>
+      </select>
+    </div>
+  `
+    : "";
+
+  details.innerHTML = `
+    <div style="margin-bottom: 20px;">
+      <h3 style="margin-bottom: 15px;">Pattern Settings</h3>
+      ${parameterControls}
+      <div style="margin-bottom: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; border: 1px solid #3d3d3d;">
+        <div style="margin-bottom: 10px; font-weight: bold;">Effect Options:</div>
+        ${expandFxHtml}
+        <label style="display: block; margin: 8px 0;">
+          <input type="checkbox" id="rev" name="rev" ${currentOptions.rev ? "checked" : ""}> Flip X
+        </label>
+        <label style="display: block; margin: 8px 0;">
+          <input type="checkbox" id="rY" name="rY" ${currentOptions.rY ? "checked" : ""}> Flip Y
+        </label>
+        <label style="display: block; margin: 8px 0;">
+          <input type="checkbox" id="mi" name="mi" ${currentOptions.mi ? "checked" : ""}> Mirror X
+        </label>
+        <label style="display: block; margin: 8px 0;">
+          <input type="checkbox" id="mY" name="mY" ${currentOptions.mY ? "checked" : ""}> Mirror Y
+        </label>
+        <label style="display: block; margin: 8px 0;">
+          <input type="checkbox" id="tp" name="tp" ${currentOptions.tp ? "checked" : ""}> Transpose
+        </label>
+      </div>
+
+      <div style="margin-bottom: 20px; padding: 15px; background: #2d2d2d; border-radius: 8px; border: 1px solid #3d3d3d;">
+        <div style="margin-bottom: 10px; font-weight: bold;">Save as Pattern:</div>
+        <select id="patternGroup" style="width: 100%; padding: 8px; margin-bottom: 10px; background: #2d2d2d; color: white; border: 1px solid #3d3d3d; border-radius: 4px; box-sizing: border-box; height: 36px;">
+          <option value="group1">Group 1</option>
+          <option value="group2">Group 2</option>
+          <option value="group3" selected>Group 3</option>
+        </select>
+        <input type="text" id="patternName" placeholder="Pattern Name" value="${effect}" style="width: 100%; padding: 8px; margin-bottom: 10px; background: #2d2d2d; color: white; border: 1px solid #3d3d3d; border-radius: 4px; box-sizing: border-box; height: 36px;">
+        <button onclick="savePattern(${effectId})" style="width: 100%; padding: 8px; background: #007BFF; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          Save
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 100px;">
+      <h3 style="margin-bottom: 15px;">Borealis Settings</h3>
+      ${brightnessControl}
+      ${audioGainControl}
+    </div>
+  `;
+
+  // Add change listeners to parameter sliders
+  if (metadata?.parameters) {
+    metadata.parameters.forEach((param) => {
+      const slider = document.getElementById(param.id);
+      if (slider) {
+        slider.addEventListener("change", async () => {
+          const value = parseInt(slider.value);
+          try {
+            await enqueueRequest(() =>
+              fetch(`${BASE_URL}/json/si`, {
+                method: "POST",
+                body: JSON.stringify({
+                  seg: {
+                    [param.id]: value,
+                  },
+                }),
+                headers: { "Content-Type": "application/json" },
+              })
+            );
+          } catch (err) {}
+        });
+      }
+    });
+  }
+
+  // Add change listener for brightness slider
+  const brightnessSlider = document.getElementById("brightness");
+  if (brightnessSlider) {
+    brightnessSlider.addEventListener("change", async () => {
+      const value = parseInt(brightnessSlider.value);
+      try {
+        await enqueueRequest(() =>
+          fetch(`${BASE_URL}/json`, {
+            method: "POST",
+            body: JSON.stringify({
+              bri: value
+            }),
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+        updateBrightnessWarning(value);
+      } catch (err) {
+        console.error("Error updating brightness:", err);
+      }
+    });
+  }
+
+  // Add change listener for audio gain slider
+  const audioGainSlider = document.getElementById("audioGain");
+  if (audioGainSlider) {
+    audioGainSlider.addEventListener("change", async () => {
+      const value = parseInt(audioGainSlider.value);
+      try {
+        await enqueueRequest(() =>
+          fetch(`${BASE_URL}/json`, {
+            method: "POST",
+            body: JSON.stringify({
+              AudioReactive: {
+                inputLevel: value
+              }
+            }),
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+        // Update peak percentage after changing gain
+        updatePeakPercentage();
+      } catch (err) {
+        console.error("Error updating audio gain:", err);
+      }
+    });
+  }
+
+  // Add change listeners to checkboxes
+  ["rev", "rY", "mi", "mY", "tp"].forEach((id) => {
+    const checkbox = document.getElementById(id);
+    if (checkbox) {
+      checkbox.addEventListener("change", async () => {
+        // Get all checkbox values
+        const options = {
+          rev: document.getElementById("rev").checked,
+          rY: document.getElementById("rY").checked,
+          mi: document.getElementById("mi").checked,
+          mY: document.getElementById("mY").checked,
+          tp: document.getElementById("tp").checked,
+        };
+
+        // Send updated effect with options
+        try {
+          await enqueueRequest(() =>
+            fetch(`${BASE_URL}/json/si`, {
+              method: "POST",
+              body: JSON.stringify({
+                seg: {
+                  fx: jsonData.effectIndices[effect],
+                  ...options,
+                },
+              }),
+              headers: { "Content-Type": "application/json" },
+            })
+          );
+        } catch (err) {}
+      });
+    }
+  });
+
+  // Add change listener for m12 dropdown
+  const m12Select = document.getElementById("m12");
+  if (m12Select) {
+    m12Select.addEventListener("change", async () => {
+      try {
+        await enqueueRequest(() =>
+          fetch(`${BASE_URL}/json/si`, {
+            method: "POST",
+            body: JSON.stringify({
+              seg: {
+                m12: parseInt(m12Select.value),
+              },
+            }),
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      } catch (err) {
+        console.error("Error updating Expand FX:", err);
+      }
+    });
+  }
+
+  // Clean up observer and interval when the effect details are updated
+  return () => {
+    // No cleanup needed
+  };
 }
 
-function updatePSliders() {
-	//update RGB sliders
-	var col = cpick.color.rgb;
-	gId('sliderR').value = col.r;
-	gId('sliderG').value = col.g;
-	gId('sliderB').value = col.b;
+// Update savePattern to handle Group 3
+async function savePattern(effectId) {
+  const patternName = document.getElementById("patternName").value.trim();
+  const patternGroup = document.getElementById("patternGroup").value;
+  const saveButton = document.querySelector('button[onclick="savePattern(' + effectId + ')"]');
 
-	//update hex field
-	var str = cpick.color.hexString.substring(1);
-	var w = whites[csel];
-	if (w > 0) str += w.toString(16);
+  if (!patternName) {
+    alert("Please enter a pattern name");
+    return;
+  }
 
-	//update value slider
-	var v = gId('sliderV');
-	v.value = cpick.color.value;
-	//background color as if color had full value
-	var hsv = {"h":cpick.color.hue,"s":cpick.color.saturation,"v":100}; 
-	var c = iro.Color.hsvToRgb(hsv);
-	var cs = 'rgb('+c.r+','+c.g+','+c.b+')';
-	v.nextElementSibling.style.backgroundImage = `linear-gradient(90deg, #000 0%, ${cs})`;
+  // Count existing patterns in each group
+  const group1Count = Object.keys(jsonData.patterns).filter(id => id < 100).length;
+  const group2Count = Object.keys(jsonData.patterns).filter(id => id >= 100 && id < 200).length;
+  const group3Count = Object.keys(jsonData.patterns).filter(id => id >= 200).length;
 
-	//update Kelvin slider
-	gId('sliderK').value = cpick.color.kelvin;
+  // Check limits based on selected group
+  if (patternGroup === "group1" && group1Count >= 99) {
+    alert("Group 1 is full (maximum 99 patterns)");
+    return;
+  }
+  if (patternGroup === "group2" && group2Count >= 99) {
+    alert("Group 2 is full (maximum 99 patterns)");
+    return;
+  }
+  if (patternGroup === "group3" && group3Count >= 50) {
+    alert("Group 3 is full (maximum 50 patterns)");
+    return;
+  }
+
+  // Get current effect options
+  const options = {
+    rev: document.getElementById("rev").checked,
+    rY: document.getElementById("rY").checked,
+    mi: document.getElementById("mi").checked,
+    mY: document.getElementById("mY").checked,
+    tp: document.getElementById("tp").checked,
+  };
+
+  // Get current effect parameters from UI controls
+  const effectData = jsonData.fxdata[jsonData.effectIndices[jsonData.effects[effectId]]];
+  const metadata = parseEffectMetadata(effectData);
+  if (metadata?.parameters) {
+    metadata.parameters.forEach(param => {
+      const slider = document.getElementById(param.id);
+      if (slider) {
+        const value = parseInt(slider.value);
+        if (!isNaN(value)) {
+          options[param.id] = value;
+        }
+      }
+    });
+  }
+
+  // Get current colors and palette from active elements
+  const activePalette = document.querySelector("#color-effects-list .list-item.active");
+  const currentPalette = activePalette ? parseInt(activePalette.dataset.paletteIndex) : 0;
+  
+  // Get current colors from color buttons
+  const colorButtons = document.querySelectorAll(".color-buttons button");
+  const currentColors = Array.from(colorButtons).map(button => {
+    const color = button.style.backgroundColor;
+    const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (match) {
+      return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+    }
+    return [255, 0, 0]; // Default to red if parsing fails
+  });
+
+  console.log("Saving pattern with:", {
+    effectId,
+    options,
+    currentPalette,
+    currentColors
+  });
+
+  // Find the next available ID based on group
+  const existingIds = Object.keys(jsonData.patterns)
+    .map((id) => parseInt(id))
+    .filter((id) => {
+      if (patternGroup === "group2") return id >= 100 && id < 200;
+      if (patternGroup === "group3") return id >= 200 && id < 250;
+      return id < 100; // group1
+    });
+
+  // Set base ID based on group
+  let baseId;
+  if (patternGroup === "group2") baseId = 100;
+  else if (patternGroup === "group3") baseId = 200;
+  else baseId = 1; // group1
+
+  const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : baseId;
+
+  // Create the new pattern with the correct structure
+  const newPattern = {
+    n: patternName,
+    mainseg: 0,
+    seg: [
+      {
+        id: 0,
+        fx: jsonData.effectIndices[jsonData.effects[effectId]],
+        ...options,
+        col: currentColors,
+        pal: currentPalette
+      },
+    ],
+  };
+
+  try {
+    // Create new presets object with all existing patterns plus the new one
+    const newPresets = { ...jsonData.patterns };
+    newPresets[nextId] = newPattern;
+
+    // Create form data with the updated presets
+    const formData = new FormData();
+    const presetsBlob = new Blob([JSON.stringify(newPresets)], {
+      type: "application/json"
+    });
+    formData.append("data", presetsBlob, "presets.json");
+
+    // Upload the new presets.json
+    const response = await fetch(`${BASE_URL}/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to upload presets");
+    }
+
+    // Update local data
+    jsonData.patterns = newPresets;
+
+    // Re-render patterns list
+    renderPatterns();
+
+    // Clear only the pattern name input, keep the group selection
+    document.getElementById("patternName").value = "";
+
+    // Add flash animation to save button
+    if (saveButton) {
+      saveButton.classList.add('save-flash');
+      // Remove the class after animation completes
+      setTimeout(() => {
+        saveButton.classList.remove('save-flash');
+      }, 500);
+    }
+
+    console.log("Pattern saved successfully");
+
+    // Select the newly saved pattern
+    await changePattern(nextId);
+  } catch (err) {
+    console.error("Error saving pattern:", err);
+    console.error("Failed to save pattern");
+  }
 }
 
-function setPicker(rgb) {
-	var c = new iro.Color(rgb);
-	if (c.value > 0) cpick.color.set(c);
-	else cpick.color.setChannel('hsv', 'v', 0);
+// Change pattern and update UI
+async function changePattern(id) {
+  try {
+    // Get the pattern data
+    const pattern = jsonData.patterns[id];
+    if (!pattern || !pattern.seg || !pattern.seg[0]) return;
+
+    const segment = pattern.seg[0];
+
+    // Send pattern change request with all parameters
+    await enqueueRequest(() =>
+      fetch(`${BASE_URL}/json/si`, {
+        method: "POST",
+        body: JSON.stringify({
+          ps: id,
+          seg: {
+            fx: segment.fx,
+            col: segment.col,
+            pal: segment.pal,
+            rev: segment.rev,
+            rY: segment.rY,
+            mi: segment.mi,
+            mY: segment.mY,
+            tp: segment.tp,
+            sx: segment.sx,
+            ix: segment.ix,
+            c1: segment.c1,
+            c2: segment.c2,
+            c3: segment.c3
+          }
+        }),
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    // Wait a moment for the device to process the change
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Fetch updated state after pattern change
+    const response = await enqueueRequest(() => fetch(`${BASE_URL}/json/si`));
+    const newState = await response.json();
+    jsonData.currentState = newState;
+
+    // Get the current segment state
+    const currentSegment = newState.state?.seg?.[0];
+    if (!currentSegment) return;
+
+    // Find the effect name that corresponds to the current effect ID
+    const effectName = jsonData.effects.find(
+      (effect) => jsonData.effectIndices[effect] === currentSegment.fx
+    );
+
+    if (effectName) {
+      const effectIndex = jsonData.effects.indexOf(effectName);
+
+      // Re-render effects list to update active state and scroll
+      renderEffects();
+
+      // Get effect metadata and set up color controls
+      const effectData = jsonData.fxdata[currentSegment.fx];
+      const metadata = parseEffectMetadata(effectData);
+      metadata.defaults = currentSegment.col.map(
+        (col) =>
+          `#${col[0].toString(16).padStart(2, "0")}${col[1]
+            .toString(16)
+            .padStart(2, "0")}${col[2].toString(16).padStart(2, "0")}`
+      );
+
+      // Update color controls
+      setupColorControls(metadata);
+
+      // Update palette previews
+      document
+        .querySelectorAll("#color-effects-list .lstIprev")
+        .forEach((preview) => {
+          const paletteData =
+            palettesData[preview.parentElement.dataset.paletteIndex];
+          if (paletteData) {
+            preview.style = genPalPrevCss(paletteData);
+          }
+        });
+
+      // Update effect details/options
+      renderEffectDetails(effectIndex);
+
+      // Always re-render palettes to update with new state
+      renderPalettes();
+
+      // Scroll if we're on the Colors tab and the effect uses palettes
+      if (
+        metadata.palette !== null &&
+        document.getElementById("tab2-content").classList.contains("active")
+      ) {
+        setTimeout(() => {
+          const activePalette = document.querySelector(
+            "#color-effects-list .list-item.active"
+          );
+          if (activePalette) {
+            activePalette.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }
+        }, 100);
+      }
+    }
+
+    // Update pattern list UI and re-render
+    renderPatterns();
+  } catch (err) {
+    console.error("Error changing pattern:", err);
+  }
 }
 
-function fromV()
-{
-	cpick.color.setChannel('hsv', 'v', d.getElementById('sliderV').value);
+// Add these variables near the top with other state variables
+let lastSendTime = 0;
+let pendingUpdates = new Map(); // Map of LED index to color
+let sendGridTimeout = null;
+
+// Add these variables near the top with other state variables
+let lastTouchX = null;
+let lastTouchY = null;
+let isDrawingTouch = false;
+
+// Replace hsvToRgb with hslToRgb
+function hslToRgb(h, s, l) {
+  let r, g, b;
+
+  if (s === 0) {
+    r = g = b = l; // achromatic
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-function fromK()
-{
-	cpick.color.set({ kelvin: d.getElementById('sliderK').value });
+function onLoad() {
+  // Check for Android WebView
+  const isAndroidWebView = /Android/i.test(navigator.userAgent) && 
+    /wv|WebView/i.test(navigator.userAgent);
+  
+  if (isAndroidWebView) {
+    showWebViewWarning();
+  }
+
+  // Initialize WebSocket first
+  initWebSocket();
+  
+  // Then load other data
+  loadAllData();
+
+  // Initialize hold-to-navigate for WLED-MM link
+  const wledLink = document.getElementById('wled-link');
+  if (wledLink) {
+    createHoldToDeleteHandler(
+      wledLink,
+      () => window.location.href = '/settings',
+      () => {}, // Do nothing on short press
+      true // Prevent default touch behavior
+    );
+  }
 }
 
-function fromRgb()
-{
-	var r = gId('sliderR').value;
-	var g = gId('sliderG').value;
-	var b = gId('sliderB').value;
-	setPicker(`rgb(${r},${g},${b})`);
-	setColor(0);
+function arraysEqual(a, b) {
+  return a.length === b.length && a.every((val, index) => val === b[index]);
 }
 
-// sets color from picker: 0=all, 1=leaving picker/HSV, 2=ignore white channel
-function setColor(sr)
-{
-	var cd = gId('csl').children; // color slots
-	if (sr == 1 && cd[csel].style.backgroundColor == 'rgb(0, 0, 0)') cpick.color.setChannel('hsv', 'v', 100);
-	cd[csel].style.backgroundColor = cpick.color.rgbString;
-	if (sr != 2) whites[csel] = parseInt(gId('sliderW').value);
-	var col = cpick.color.rgb;
-	var obj = {"seg": {"col": [[col.r, col.g, col.b, whites[csel]],[],[]]}};
-	if (sr==1 || gId(`picker`).style.display !== "block") obj.seg.fx = 0;
-	if (csel == 1) {
-		obj = {"seg": {"col": [[],[col.r, col.g, col.b, whites[csel]],[]]}};
-	} else if (csel == 2) {
-		obj = {"seg": {"col": [[],[],[col.r, col.g, col.b, whites[csel]]]}};
-	}
-	requestJson(obj);
+let gridInitialized = false;
+let ws = null;  // Global WebSocket variable
+
+// Update the WebSocket initialization
+function initWebSocket() {
+  try {
+    // Close existing WebSocket if any
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.close();
+    }
+
+    const wsUrl = window.location.protocol === "file:" 
+      ? "ws://192.168.1.165/ws"
+      : (window.location.protocol === "https:" ? "wss://" : "ws://") + 
+        window.location.host + 
+        "/ws";
+
+    ws = new WebSocket(wsUrl);
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+      // Request live data
+      ws.send('{"lv":true}');
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket closed, retrying in 1.5s");
+      setTimeout(initWebSocket, 1500);
+    };
+
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+      ws.close();
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        if (event.data instanceof ArrayBuffer) {
+          // Handle binary LED data
+          let leds = new Uint8Array(event.data);
+          if (leds[0] != 76) return; //'L'
+
+          // Check if it's 2D data
+          const is2D = leds[1] === 2;
+          const width = is2D ? leds[2] : leds.length / 3;
+          const height = is2D ? leds[3] : 1;
+          const start = is2D ? 4 : 2;
+
+          // Process LED data into 2D array, excluding rightmost column
+          let segments = [];
+          for (let y = 0; y < height; y++) {
+            let row = [];
+            for (let x = 0; x < width - 1; x++) { // Subtract 1 to exclude rightmost column
+              const idx = start + (y * width + x) * 3;
+              if (idx + 2 < leds.length) {
+                row.push([leds[idx], leds[idx + 1], leds[idx + 2]]);
+              }
+            }
+            segments.push(row);
+          }
+
+          // Update both preview canvases
+          const updateCanvas = (canvasId) => {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext("2d");
+            const containerWidth = canvas.parentElement.clientWidth;
+            const pixelSize = containerWidth / (width - 1); // Adjust for excluded column
+            const canvasHeight = pixelSize * height;
+            
+            // Update canvas dimensions
+            canvas.width = containerWidth;
+            canvas.height = canvasHeight;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw LED matrix
+            segments.forEach((row, y) => {
+              row.forEach((color, x) => {
+                ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+                ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+              });
+            });
+          };
+
+          // Update both canvases
+          updateCanvas("preview-canvas");
+          updateCanvas("preview-canvas-mobile");
+        }
+      } catch (err) {
+        console.error("Error processing WebSocket message:", err);
+      }
+    };
+  } catch (err) {
+    console.error("Error initializing WebSocket:", err);
+    setTimeout(initWebSocket, 1500);
+  }
 }
 
-function setBalance(b)
-{
-	var obj = {"seg": {"cct": parseInt(b)}};
-	requestJson(obj);
+// Update the updateGridFromSegments function
+function updateGridFromSegments(segments) {
+  const grid = document.getElementById("drawing-grid");
+  const cells = grid.children;
+  const width = 10;  // Grid width
+  const height = 60; // Grid height
+
+  segments.forEach((color, index) => {
+    if (index < cells.length) {
+      cells[index].style.backgroundColor = "#" + color;
+    }
+  });
 }
 
-var hc = 0;
-setInterval(()=>{if (!isInfo) return; hc+=18; if (hc>300) hc=0; if (hc>200)hc=306; if (hc==144) hc+=36; if (hc==108) hc+=18;
-gId('heart').style.color = `hsl(${hc}, 100%, 50%)`; gId('heartMM').style.color = `hsl(${hc}, 100%, 50%)`;}, 910);
+// Update showTab function to handle only 4 tabs
+function showTab(tabNumber) {
+  currentTab = tabNumber;
 
-function openGH() { window.open("https://github.com/Aircoookie/WLED/wiki"); }
+  // Remove brightness warning when switching tabs
+  const existingWarning = document.querySelector('.brightness-warning');
+  if (existingWarning) {
+    existingWarning.remove();
+  }
 
-var cnfr = false;
-function cnfReset()
-{
-	if (!cnfr) {
-		var bt = gId('resetbtn');
-		bt.style.color = "#f00";
-		bt.innerHTML = "Confirm Reboot";
-		cnfr = true; return;
-	}
-	window.location.href = "/reset";
+  // Update tab content visibility
+  document.querySelectorAll(".tab-content").forEach((content) => {
+    content.classList.remove("active");
+  });
+  const tabContent = document.getElementById(`tab${tabNumber}-content`);
+  if (tabContent) {
+    tabContent.classList.add("active");
+  }
+
+  // Update tab button states
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.classList.remove("active");
+  });
+  const selectedTab = document.querySelector(`.tab:nth-child(${tabNumber})`);
+  if (selectedTab) {
+    selectedTab.classList.add("active");
+  }
+
+  // Handle specific tab behaviors
+  if (tabNumber === 2) {
+    // Colors tab
+    const colorEffectsList = document.getElementById("color-effects-list");
+    if (colorEffectsList) {
+      colorEffectsList.classList.add("visible");
+      renderPalettes();
+    }
+  }
+
+  // Handle scrolling for all tabs except Options
+  if (tabNumber !== 4) {
+    requestAnimationFrame(() => {
+      const scrollTargets = {
+        2: "#color-effects-list .list-item.active",
+        3: "#effects-list .list-item.active"
+      };
+
+      const target = document.querySelector(scrollTargets[tabNumber]);
+      if (target) {
+        target.scrollIntoView({ block: "center" });
+      }
+    });
+  }
+
+  // Reset scroll position for other tabs
+  if (tabContent) {
+    tabContent.scrollTop = 0;
+  }
 }
 
-function loadPalettesData(callback = null)
-{
-	if (palettesData) return;
-	const lsKey = "wledPalx";
-	var palettesDataJson = localStorage.getItem(lsKey);
-	if (palettesDataJson) {
-		try {
-			palettesDataJson = JSON.parse(palettesDataJson);
-			if (palettesDataJson && palettesDataJson.vid == lastinfo.vid) {
-				palettesData = palettesDataJson.p;
-				if (callback) callback(); //redrawPalPrev()
-				return;
-			}
-		} catch (e) {}
-	}
+// Update setupColorControls to handle both mobile and desktop layouts
+function setupColorControls(metadata) {
+  const colorPicker = document.getElementById("color-picker");
+  const paletteList = document.getElementById("color-effects-list");
+  const topSection = document.querySelector(".colors-top-section");
 
-	palettesData = {};
-	getPalettesData(0, ()=>{
-		localStorage.setItem(lsKey, JSON.stringify({
-			p: palettesData,
-			vid: lastinfo.vid
-		}));
-		if (callback) setTimeout(callback, 99); //redrawPalPrev()
-	});
+  // Remove any existing color buttons container
+  const existingButtons = document.querySelector(".color-buttons");
+  if (existingButtons) {
+    existingButtons.remove();
+  }
+
+  // Hide palette list if effect doesn't use palettes
+  if (paletteList) {
+    if (metadata.palette === null) {
+      paletteList.style.cssText =
+        "display: none !important; visibility: hidden; opacity: 0;";
+      paletteList.classList.remove("visible");
+    } else {
+      paletteList.style.cssText = "";
+      paletteList.classList.add("visible");
+      // Only render palettes if they haven't been rendered yet
+      if (!paletteList.children.length) {
+        renderPalettes();
+      }
+    }
+  }
+
+  // Get current palette data
+  const currentPaletteIndex = jsonData.currentState?.state?.pal;
+  const paletteData = palettesData[currentPaletteIndex] || [];
+
+  // Show color picker if there are colors to set
+  if (metadata.colors && metadata.colors.length > 0) {
+    if (colorPicker) {
+      colorPicker.style.display = "block";
+
+      // Initialize color picker if it hasn't been initialized yet
+      if (!window.colorPicker) {
+        window.colorPicker = new iro.ColorPicker("#color-picker", {
+          width: 200,
+          color: "#ff0000",
+          layout: [
+            {
+              component: iro.ui.Wheel,
+              options: {
+                wheelLightness: false,
+                wheelAngle: 0,
+                wheelDirection: "anticlockwise",
+              },
+            },
+            {
+              component: iro.ui.Slider,
+              options: {
+                sliderType: "value",
+                sliderSize: 30,
+              },
+            },
+          ],
+        });
+      } else {
+        // Remove existing color change listener if it exists
+        window.colorPicker.off("color:change");
+      }
+
+      // Create color selection buttons
+      const colorButtons = document.createElement("div");
+      colorButtons.className = "color-buttons";
+      colorButtons.style.cssText = `
+          display: flex;
+          flex-direction: row;
+          gap: 10px;
+          margin: 20px 0;
+          width: 100%;
+        `;
+
+      // Track selected color index
+      let selectedColorIndex = 0;
+
+      // Use the number of colors from metadata
+      const totalColors = metadata.colors.length;
+
+      // Always get current colors from state
+      const currentColors =
+        jsonData.currentState?.state?.seg?.[0]?.col ||
+        Array(totalColors).fill([255, 255, 255]);
+      const colorSlots = currentColors.map(
+        (col) =>
+          `#${col[0].toString(16).padStart(2, "0")}${col[1]
+            .toString(16)
+            .padStart(2, "0")}${col[2].toString(16).padStart(2, "0")}`
+      );
+
+      // Create buttons for each color slot
+      for (let i = 0; i < totalColors; i++) {
+        const button = document.createElement("button");
+        const colorLabel = metadata.colors?.[i] || `Color ${i + 1}`;
+        button.textContent = colorLabel === "!" ? `Color ${i + 1}` : colorLabel;
+
+        button.style.cssText = `
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: ${colorSlots[i]};
+            color: ${getContrastColor(colorSlots[i])};
+            border: ${i === 0 ? "3px solid #ff00ff" : "none"};
+            box-shadow: ${i === 0 ? "0 0 10px rgba(255, 0, 255, 0.7)" : "none"};
+            transition: all 0.2s ease;
+            flex: 1;
+            font-size: 16px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: ${
+              getContrastColor(colorSlots[i]) === "#ffffff"
+                ? "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"
+                : "-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff"
+            };
+            font-weight: bold;
+          `;
+
+        button.onclick = () => {
+          selectedColorIndex = i;
+
+          // Update button styles first
+          colorButtons.querySelectorAll("button").forEach((btn, idx) => {
+            btn.style.border = idx === i ? "3px solid #ff00ff" : "none";
+            btn.style.boxShadow =
+              idx === i ? "0 0 10px rgba(255, 0, 255, 0.7)" : "none";
+          });
+
+          // Set the color picker value without triggering an update
+          window.colorPicker.color.set(colorSlots[i], { silent: true });
+        };
+        colorButtons.appendChild(button);
+      }
+
+      // Add single color change listener
+      window.colorPicker.on("color:change", (color) => {
+        const hexColor = color.hexString;
+        colorSlots[selectedColorIndex] = hexColor;
+
+        // Update button background color and text contrast immediately
+        const buttons = colorButtons.querySelectorAll("button");
+        const button = buttons[selectedColorIndex];
+        button.style.backgroundColor = hexColor;
+        const contrastColor = getContrastColor(hexColor);
+        button.style.color = contrastColor;
+        button.style.textShadow =
+          contrastColor === "#ffffff"
+            ? "-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000"
+            : "-1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff";
+
+        // Only send updates to API when dragging ends
+        if (!color.isMoving) {
+          enqueueRequest(async () => {
+            const payload = {
+              seg: {
+                col: colorSlots.map((color) => {
+                  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
+                  return [
+                    parseInt(result[1], 16),
+                    parseInt(result[2], 16),
+                    parseInt(result[3], 16)
+                  ];
+                })
+              }
+            };
+
+            await fetch(`${BASE_URL}/json/si`, {
+              method: "POST",
+              body: JSON.stringify(payload),
+              headers: { "Content-Type": "application/json" }
+            });
+
+            // Update the current state with the new colors
+            if (!jsonData.currentState.state) {
+              jsonData.currentState.state = {};
+            }
+            if (!jsonData.currentState.state.seg) {
+              jsonData.currentState.state.seg = [{}];
+            }
+            jsonData.currentState.state.seg[0].col = payload.seg.col;
+
+            // Update palette previews with a slight delay to ensure state is updated
+            setTimeout(() => {
+              document.querySelectorAll("#color-effects-list .lstIprev").forEach((preview) => {
+                const paletteData = palettesData[preview.parentElement.dataset.paletteIndex];
+                if (paletteData && paletteData.some((e) => typeof e === "string" && e.startsWith("c"))) {
+                  // Create a copy of the palette data to avoid modifying the original
+                  const updatedPaletteData = paletteData.map(e => {
+                    if (typeof e === "string" && e.startsWith("c")) {
+                      const slotNum = parseInt(e.substring(1)) - 1;
+                      return colorSlots[slotNum] ? 
+                        [Math.round((slotNum / (colorSlots.length - 1)) * 255), ...hexToRgb(colorSlots[slotNum])] :
+                        e;
+                    }
+                    return e;
+                  });
+                  preview.style = genPalPrevCss(updatedPaletteData);
+                }
+              });
+            }, 50);
+          });
+        }
+      });
+
+      // Helper function to convert hex to RGB
+      function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? [
+          parseInt(result[1], 16),
+          parseInt(result[2], 16),
+          parseInt(result[3], 16)
+        ] : [255, 255, 255];
+      }
+
+      // Insert color buttons after the color picker in the top section
+      topSection.appendChild(colorButtons);
+    }
+  } else {
+    // Hide color picker if no colors are needed
+    if (colorPicker) {
+      colorPicker.style.display = "none";
+    }
+  }
 }
 
-function getPalettesData(page, callback)
-{
-	var url = (loc?`http://${locip}`:'') + `/json/palx?page=${page}`;
+// Add these functions near the top of the script section
+function showToast(text, error = false) {
+  // Create modal container if it doesn't exist
+  let modal = document.getElementById('alertModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'alertModal';
+    modal.style.cssText = `
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 2000;
+    `;
+    document.body.appendChild(modal);
+  }
 
-	fetch(url, {
-		method: 'get',
-		headers: {
-			"Content-type": "application/json; charset=UTF-8"
-		}
-	})
-	.then((res)=>{
-		if (!res.ok) showErrorToast();
-		return res.json();
-	})
-	.then((json)=>{
-		palettesData = Object.assign({}, palettesData, json.p);
-		if (page < json.m) setTimeout(()=>{ getPalettesData(page + 1, callback); }, 50);
-		else callback();
-	})
-	.catch((e)=>{
-		showToast(e, true);
-	});
+  // Create modal content
+  const modalContent = document.createElement('div');
+  modalContent.style.cssText = `
+    position: relative;
+    background-color: #1e1e1e;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #2d2d2d;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 600px;
+    color: white;
+  `;
+
+  // Add close button
+  const closeBtn = document.createElement('span');
+  closeBtn.innerHTML = '&times;';
+  closeBtn.style.cssText = `
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  `;
+  closeBtn.onclick = () => {
+    modal.style.display = 'none';
+  };
+
+  // Add message
+  const message = document.createElement('p');
+  message.textContent = text;
+  message.style.cssText = `
+    margin: 0;
+    padding: 0;
+    color: ${error ? '#ff4444' : '#ffffff'};
+  `;
+
+  // Assemble modal
+  modalContent.appendChild(closeBtn);
+  modalContent.appendChild(message);
+  modal.innerHTML = '';
+  modal.appendChild(modalContent);
+
+  // Show modal
+  modal.style.display = 'block';
+
+  // Auto-hide after 5 seconds if not an error
+  if (!error) {
+    setTimeout(() => {
+      modal.style.display = 'none';
+    }, 5000);
+  }
 }
 
-function search(f,l=null)
-{
-	f.nextElementSibling.style.display=(f.value!=='')?'block':'none';
-	if (!l) return;
-	var el = gId(l).querySelectorAll('.lstI');
-	for (i = 0; i < el.length; i++) {
-		var it = el[i];
-		var itT = it.querySelector('.lstIname').innerText.toUpperCase();
-		it.style.display = itT.indexOf(f.value.toUpperCase())>-1?'':'none';
-	}
+function showErrorToast() {
+  console.error("Connection to light failed!");
 }
 
-function clean(c)
-{
-	c.style.display='none';
-	var i=c.previousElementSibling;
-	i.value='';
-	i.focus();
-	i.dispatchEvent(new Event('input'));
+// Add this helper function near the top with the other helper functions
+function queuedFetch(url) {
+  return enqueueRequest(async () => {
+    const response = await fetch(`${BASE_URL}${url}`);
+    return response.json();
+  });
 }
 
-function unfocusSliders()
-{
-	gId("sliderBri").blur();
-	gId("sliderSpeed").blur();
-	gId("sliderIntensity").blur();
+// Add this helper function near the top of the script section
+function getContrastColor(hexcolor) {
+  // Remove the # if present
+  const hex = hexcolor.replace("#", "");
+
+  // Convert hex to RGB
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+
+  // Calculate perceived brightness using the sRGB color space formula
+  // See: https://www.w3.org/TR/AERT/#color-contrast
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+
+  // Return white for dark colors, black for light colors
+  return brightness < 128 ? "#ffffff" : "#000000";
 }
 
-//sliding UI
-const _C = d.querySelector('.container'), N = 1;
+// Update deletePattern to handle Group 3
+async function deletePattern(id, name) {
+  if (!confirm(`Are you sure you want to delete pattern "${name}"?`)) {
+    return;
+  }
 
-let iSlide = 0, x0 = null, scrollS = 0, locked = false, w;
+  try {
+    // Create new presets object
+    const newPresets = {};
 
-function unify(e) {	return e.changedTouches ? e.changedTouches[0] : e; }
+    // Separate patterns into groups and sort by ID
+    const group1Patterns = [];
+    const group2Patterns = [];
+    const group3Patterns = [];
 
-function hasIroClass(classList)
-{
-	for (var i = 0; i < classList.length; i++) {
-		var element = classList[i];
-		if (element.startsWith('Iro')) return true;
-	}
-	return false;
-}
-//required by rangetouch.js
-function lock(e)
-{
-	var l = e.target.classList;
-	var pl = e.target.parentElement.classList;
+    Object.entries(jsonData.patterns).forEach(([patternId, pattern]) => {
+      if (patternId != id) { // Skip the pattern being deleted
+        if (patternId < 100) {
+          group1Patterns.push([parseInt(patternId), pattern]);
+        } else if (patternId < 200) {
+          group2Patterns.push([parseInt(patternId), pattern]);
+        } else if (patternId < 250) {
+          group3Patterns.push([parseInt(patternId), pattern]);
+        }
+      }
+    });
 
-	if (l.contains('noslide') || hasIroClass(l) || hasIroClass(pl)) return;
+    // Sort patterns by ID within each group
+    group1Patterns.sort(([a], [b]) => a - b);
+    group2Patterns.sort(([a], [b]) => a - b);
+    group3Patterns.sort(([a], [b]) => a - b);
 
-	x0 = unify(e).clientX;
-	scrollS = gEBCN("tabcontent")[iSlide].scrollTop;
+    // Reindex patterns starting from appropriate base IDs
+    group1Patterns.forEach(([_, pattern], index) => {
+      newPresets[index + 1] = pattern;
+    });
+    group2Patterns.forEach(([_, pattern], index) => {
+      newPresets[index + 100] = pattern;
+    });
+    group3Patterns.forEach(([_, pattern], index) => {
+      newPresets[index + 200] = pattern;
+    });
 
-	_C.classList.toggle('smooth', !(locked = true));
-}
-//required by rangetouch.js
-function move(e)
-{
-	if(!locked) return;
-	var clientX = unify(e).clientX;
-	var dx = clientX - x0;
-	var s = Math.sign(dx);
-	var f = +(s*dx/w).toFixed(2);
+    // Create form data with the updated presets
+    const formData = new FormData();
+    const presetsBlob = new Blob([JSON.stringify(newPresets)], {
+      type: "application/json"
+    });
+    formData.append("data", presetsBlob, "presets.json");
 
-	if((clientX != 0) &&
-		(iSlide > 0 || s < 0) && (iSlide < N - 1 || s > 0) &&
-		f > 0.12 &&
-		gEBCN("tabcontent")[iSlide].scrollTop == scrollS)
-	{
-		_C.style.setProperty('--i', iSlide -= s);
-		f = 1 - f;
-		updateTablinks(iSlide);
-	}
-	_C.style.setProperty('--f', f);
-	_C.classList.toggle('smooth', !(locked = false));
-	x0 = null;
-}
+    // Upload the new presets.json
+    const response = await fetch(`${BASE_URL}/upload`, {
+      method: "POST",
+      body: formData,
+    });
 
-function size()
-{
-	var h = gId('top').clientHeight;
-	sCol('--th', h + "px");
-    sCol("--tp", h - (gId(`briwrap`).style.display === "block" ? 0 : gId(`briwrap`).clientTop) + "px");
-    sCol("--bh", "0px");
-}
+    if (!response.ok) {
+      throw new Error("Failed to upload presets");
+    }
 
-function mergeDeep(target, ...sources)
-{
-	if (!sources.length) return target;
-	const source = sources.shift();
+    // Update local data
+    jsonData.patterns = newPresets;
 
-	if (isObj(target) && isObj(source)) {
-		for (const key in source) {
-			if (isObj(source[key])) {
-				if (!target[key]) Object.assign(target, { [key]: {} });
-				mergeDeep(target[key], source[key]);
-			} else {
-				Object.assign(target, { [key]: source[key] });
-			}
-		}
-	}
-	return mergeDeep(target, ...sources);
+    // Re-render patterns list
+    renderPatterns();
+
+    console.log("Pattern deleted successfully");
+  } catch (err) {
+    console.error("Error deleting pattern:", err);
+    console.error("Failed to delete pattern");
+  }
 }
 
-size();
-window.addEventListener('resize', size, false);
+// Add this function before setBrightness
+function updateBrightnessWarning(value) {
+  const warningContainer = document.getElementById('brightness-warning-container');
+  if (!warningContainer) return;
+  
+  // Clear any existing warning
+  warningContainer.innerHTML = '';
 
-_C.addEventListener('mousedown', lock, false);
-_C.addEventListener('touchstart', lock, false);
+  // Show warning if brightness is high, regardless of tab visibility
+  if (value > 128) {
+    const warning = document.createElement('div');
+    warning.className = 'brightness-warning';
+    warning.style.cssText = `
+      background: rgba(0, 0, 0, 0.8);
+      color: rgb(255, 7, 7);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      text-align: center;
+    `;
+    warning.textContent = '⚠️ High levels will reduce battery life!';
+    warningContainer.appendChild(warning);
+  }
+}
 
-_C.addEventListener('mouseout', move, false);
-_C.addEventListener('mouseup', move, false);
-_C.addEventListener('touchend', move, false);
+// Update setBrightness function
+async function setBrightness(value) {
+  try {
+    await enqueueRequest(() =>
+      fetch(`${BASE_URL}/json`, {
+        method: "POST",
+        body: JSON.stringify({
+          bri: value
+        }),
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    
+    // Update the brightness slider
+    const brightnessSlider = document.getElementById("brightness");
+    if (brightnessSlider) {
+      brightnessSlider.value = value;
+      updateBrightnessWarning(value);
+    }
+    
+    // Update button states
+    document.querySelectorAll('[onclick^="setBrightness"]').forEach(button => {
+      const buttonValue = parseInt(button.getAttribute('onclick').match(/\d+/)[0]);
+      button.style.background = buttonValue === value ? '#007BFF' : '#2d2d2d';
+    });
+  } catch (err) {
+    console.error("Error updating brightness:", err);
+  }
+}
+
+function showWebViewWarning() {
+  // Create modal container if it doesn't exist
+  let modal = document.getElementById('alertModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'alertModal';
+    modal.style.cssText = `
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 2000;
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Create modal content
+  const modalContent = document.createElement('div');
+  modalContent.style.cssText = `
+    position: relative;
+    background-color: #1e1e1e;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #2d2d2d;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 600px;
+    color: white;
+  `;
+
+  // Add close button
+  const closeBtn = document.createElement('span');
+  closeBtn.innerHTML = '&times;';
+  closeBtn.style.cssText = `
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+  `;
+  closeBtn.onclick = () => {
+    modal.style.display = 'none';
+  };
+
+  // Add message
+  const message = document.createElement('p');
+  message.innerHTML = "<center><b>Unfortunately, the Android Wi-Fi login browser doesn't support proper scrolling.</b><br><br>To fix this, tap the three-dot menu in the top right corner and select <i>Use this network as is</i>.<br><br>Then, open <a href='http://4.3.2.1/' target='_blank'>http://4.3.2.1/</a> directly in your regular browser.</center>";
+  message.style.cssText = `
+    margin: 0;
+    padding: 0;
+    color: #ff4444;
+  `;
+
+  // Assemble modal
+  modalContent.appendChild(closeBtn);
+  modalContent.appendChild(message);
+  modal.innerHTML = '';
+  modal.appendChild(modalContent);
+
+  // Show modal
+  modal.style.display = 'block';
+}
